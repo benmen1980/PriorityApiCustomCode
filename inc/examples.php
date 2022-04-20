@@ -26,5 +26,4 @@ function simply_search_customer_in_priority($order){
         $custname = null;
     }
     return $custname;
-
 }
