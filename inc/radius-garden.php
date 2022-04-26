@@ -28,6 +28,6 @@ function simply_request_data_func($data)
 add_filter('simply_syncCustomer','simply_syncCustomer');
 function simply_syncCustomer($data){
     unset($data['EDOCUMENTS']);
-    retrun $data;
+    return $data;
 }
 
