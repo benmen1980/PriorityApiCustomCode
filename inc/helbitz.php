@@ -2,12 +2,12 @@
 add_filter('simply_request_data','manipulate_data');
 function manipulate_data($data){
     $items = [];
-    foreach($data['EINVOICEITEMS_SUBFORM'] as $item ){
+    foreach($data['ORDERITEMSITEMS_SUBFORM'] as $item ){
         if($item['PARTNAME']==''){
             $item['PARTNAME'] =  '000';
         }
         $items[] = $item;
     }
-    $data['EINVOICEITEMS_SUBFORM'] = $items;
+    $data['ORDERITEMS_SUBFORM'] = $items;
     return $data;
 }

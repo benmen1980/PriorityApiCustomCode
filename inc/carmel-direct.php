@@ -25,5 +25,6 @@ function simply_search_customer_in_priority($data){
     }else{
         $custname = null;
     }
-    return $custname;
+    $data['CUSTNAME'] = $custname;
+    return $data;
 }
