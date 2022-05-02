@@ -2,7 +2,7 @@
 add_filter('simply_request_data','manipulate_data');
 function manipulate_data($data){
     $items = [];
-    foreach($data['ORDERITEMSITEMS_SUBFORM'] as $item ){
+    foreach($data['ORDERITEMS_SUBFORM'] as $item ){
         if($item['PARTNAME']==''){
             $item['PARTNAME'] =  '000';
         }
