@@ -9,5 +9,6 @@ function manipulate_data($data){
         $items[] = $item;
     }
     $data['EINVOICEITEMS_SUBFORM'] = $items;
+    unset($data['IVDATE']);
     return $data;
 }
