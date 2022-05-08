@@ -6,7 +6,8 @@ function simply_request_data_func($data)
 {
     $id_order = $data["orderId"];
     $order = new \WC_Order($id_order);
-    $i = sizeof($data['ORDERITEMS_SUBFORM']) - 1;
+    //$i = sizeof($data['ORDERITEMS_SUBFORM']) - 1;
+    $i = 0;
     foreach ($order->get_items() as $item) {
         $item_meta = wc_get_order_item_meta($item->get_id(), '_options_sku');
         $json = explode(',', $item_meta);
