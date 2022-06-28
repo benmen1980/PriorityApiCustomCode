@@ -5,6 +5,7 @@ function manipulate_data($data){
     foreach($data['EINVOICEITEMS_SUBFORM'] as $item ){
         if($item['PARTNAME']==''){
             $item['PARTNAME'] =  '000';
+            $item['PDES']=get_post($item['id'])->post_title;
         }
         $items[] = $item;
     }
