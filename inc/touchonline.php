@@ -8,7 +8,6 @@ function simply_func($data){
     if($cashback>0){
         $data['ORDERITEMS_SUBFORM'][] = [
             'BARCODE' => 'CB1234', // change to other item
-
             'VATPRICE' => -1* $cashback,
             'TQUANT'   => -1,
 
@@ -23,5 +22,10 @@ function simply_set_priority_sku_field_func($fieldname)
 {
     $fieldname="BARCODE";
     return $fieldname;
+}
+add_filter('simply_syncCustomer','simply_syncCustomer_func');
+function simply_syncCustomer_func($request)
+{
+    unset($request['EDOCUMENTS']);
 }
 ?>
