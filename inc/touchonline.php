@@ -28,6 +28,7 @@ add_filter('simply_syncCustomer', 'simply_syncCustomer_func');
 function simply_syncCustomer_func($request)
 {
     unset($request['EDOCUMENTS']);
+    return $request;
 }
 
 ?>
