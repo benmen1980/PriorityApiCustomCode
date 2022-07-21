@@ -7,22 +7,20 @@ function simply_ItemsAtrrVariation_func($item)
     return $attributes;
 }
 
+use PriorityWoocommerceAPI\WooAPI;
+
 add_filter('simply_modify_long_text', 'simply_modify_long_text_func');
 function simply_modify_long_text_func($data)
 {
-    $response = $this->makeRequest('GET',
-        'LOGPART(\'' . $data['sku'] . '\')?$select=PARTNAME&$expand=PARTTEXT_SUBFORM',
-        [], $this->option('log_items_priority_variation', true));
+
+    $response = WooAPI::instance()->makeRequest('GET', 'LOGPART(\'' . $data['sku'] . '\')?$select=PARTNAME&$expand=PARTTEXT_SUBFORM',
+        [], true);
     $response_data = json_decode($response['body_raw'], true);
-    $item = $response_data['value'][0];
-    if (isset($item['content'])) {
-        $item['content'] = '';
-    }
-    if (isset($item['PARTTEXT_SUBFORM'])) {
-        foreach ($item['PARTTEXT_SUBFORM'] as $text) {
-            $item['content'] .= $text;
+
+    if (isset($response_data['PARTTEXT_SUBFORM'])) {
+        foreach ($response_data['PARTTEXT_SUBFORM'] as $text) {
+            $data['text'] .= $text;
         }
     }
-    $data['text'] = $item['content'];
     return $data;
 }
