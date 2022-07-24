@@ -13,7 +13,7 @@ function simply_request_data_func($data)
         $data['ORDERITEMS_SUBFORM'][$i]['UNI_ORDTYPE'] = 'B';
         $data['ORDERITEMS_SUBFORM'][$i]['DUEDATE'] = date('Y-m-d');
         $data['ORDERITEMS_SUBFORM'][$i]['DOERLOGIN'] = 'israela';
-        $data['ORDERITEMS_SUBFORM'][$i]['UNI_WARHSNAME'] = $item_warehouse];
+        $data['ORDERITEMS_SUBFORM'][$i]['UNI_WARHSNAME'] = $item_warehouse;
     }
     return $data;
 
