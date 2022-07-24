@@ -1,18 +1,29 @@
 <?php
 //SimplyCT.co.il
+use PriorityWoocommerceAPI\WooAPI;
+
 add_filter('simply_request_data', 'simply_request_data_func');
 function simply_request_data_func($data)
 {
-    $id = $data["orderId"];
-    $order = new \WC_Order($id);
-    if (get_post_meta($order->get_id(), '_billing_country', true) != 'IL') {
-        $data['998'] = $order->get_cart_tax();
-        $i = 0;
-        foreach ($order->get_items() as $item_id => $item) {
-            $product = $item->get_product();
-            if ($product) {
-                $data['ORDERITEMS_SUBFORM'][$i++]['VATPRICE'] = (float)$item->get_subtotal();
+    if ($data['doctype'] == 'ORDERS') {
+        $id = $data["orderId"];
+        $order = new \WC_Order($id);
+        if (get_post_meta($order->get_id(), '_billing_country', true) != 'IL') {
+
+            $i = 0;
+            foreach ($order->get_items() as $item_id => $item) {
+                $product = $item->get_product();
+                if ($product) {
+                    $data['ORDERITEMS_SUBFORM'][$i++]['VATPRICE'] = (float)$item->get_subtotal();
+                }
+
             }
+            $data['ORDERITEMS_SUBFORM'][sizeof($data['ORDERITEMS_SUBFORM'])] = [
+                WooAPI::instance()->get_sku_prioirty_dest_field() => '998',
+                'TQUANT' => (int)1,
+                'DUEDATE' => date('Y-m-d'),
+            ];
+            $data['ORDERITEMS_SUBFORM'][sizeof($data['ORDERITEMS_SUBFORM']) - 1]['VATPRICE'] = (float)$order->get_cart_tax();
 
         }
     }
