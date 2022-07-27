@@ -5,11 +5,10 @@ use PriorityWoocommerceAPI\WooAPI;
 add_filter('simply_request_data', 'simply_request_data_func');
 function simply_request_data_func($data)
 {
-    if ($data['doctype'] == 'ORDERS') {
-        $id = $data["orderId"];
-        $order = new \WC_Order($id);
-        if (get_post_meta($order->get_id(), '_billing_country', true) != 'IL') {
-
+    $id = $data["orderId"];
+    $order = new \WC_Order($id);
+    if (get_post_meta($order->get_id(), '_billing_country', true) != 'IL') {
+        if ($data['doctype'] == 'ORDERS') {
             $i = 0;
             foreach ($order->get_items() as $item_id => $item) {
                 $product = $item->get_product();
@@ -25,6 +24,22 @@ function simply_request_data_func($data)
             ];
             $data['ORDERITEMS_SUBFORM'][sizeof($data['ORDERITEMS_SUBFORM']) - 1]['VATPRICE'] = (float)$order->get_cart_tax();
 
+
+        } else if ($data['doctype'] == 'AINVOICES') {
+            $i = 0;
+            foreach ($order->get_items() as $item_id => $item) {
+                $product = $item->get_product();
+                if ($product) {
+                    $data['AINVOICEITEMS_SUBFORM'][$i++]['TOTPRICE'] = (float)$item->get_subtotal();
+                }
+
+            }
+            $data['AINVOICEITEMS_SUBFORM'][sizeof($data['AINVOICEITEMS_SUBFORM'])] = [
+                WooAPI::instance()->get_sku_prioirty_dest_field() => '998',
+                'TQUANT' => (int)1,
+                'DUEDATE' => date('Y-m-d'),
+            ];
+            $data['AINVOICEITEMS_SUBFORM'][sizeof($data['AINVOICEITEMS_SUBFORM']) - 1]['TOTPRICE'] = (float)$order->get_cart_tax();
         }
     }
     return $data;
