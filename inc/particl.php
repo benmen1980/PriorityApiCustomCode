@@ -37,7 +37,6 @@ function simply_request_data_func($data)
             $data['AINVOICEITEMS_SUBFORM'][sizeof($data['AINVOICEITEMS_SUBFORM'])] = [
                 WooAPI::instance()->get_sku_prioirty_dest_field() => '998',
                 'TQUANT' => (int)1,
-                'DUEDATE' => date('Y-m-d'),
             ];
             $data['AINVOICEITEMS_SUBFORM'][sizeof($data['AINVOICEITEMS_SUBFORM']) - 1]['TOTPRICE'] = (float)$order->get_cart_tax();
         }
