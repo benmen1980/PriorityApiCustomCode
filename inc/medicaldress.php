@@ -15,6 +15,7 @@ function simply_request_data_func($data)
         $data['ORDERITEMS_SUBFORM'][$i]['DOERLOGIN'] = 'israela';
         $data['ORDERITEMS_SUBFORM'][$i]['UNI_WARHSNAME'] = $item_warehouse;
     }
+    unset($data['PAYMENTDEF_SUBFORM']['EMAIL']);
     return $data;
 
 }
