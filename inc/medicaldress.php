@@ -3,7 +3,7 @@ add_filter('simply_request_data', 'simply_request_data_func');
 function simply_request_data_func($data)
 {
     $item_warehouse = '75';
-    $data['DCODE'] = 'web';
+    $data['DCODE'] = '1309';
     $data['DETAILS'] = '01699985';
     $data['UNI_ORDTYPE'] = 'B';
     $data['UNI_DUEDATE'] = date('Y-m-d');
