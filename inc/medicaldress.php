@@ -3,11 +3,13 @@ add_filter('simply_request_data', 'simply_request_data_func');
 function simply_request_data_func($data)
 {
     $item_warehouse = '75';
-    $data['DCODE'] = '1309';
-    $data['DETAILS'] = '01699985';
+    $data['DETAILS'] = 'MED-' . $data['BOOKNUM'];
+    if ($data['doctype'] == 'TINVOICES') {
+        $data['BOOKNUM'] = $data['DETAILS'];
+    }
     $data['UNI_ORDTYPE'] = 'B';
     $data['UNI_DUEDATE'] = date('Y-m-d');
-    $data['UFLR_ORDERRCVCODE'] = '8';
+    $data['UFLR_ORDERRCVCODE'] = '25';
 
     for ($i = 0; $i < count($data['ORDERITEMS_SUBFORM']); $i++) {
         $data['ORDERITEMS_SUBFORM'][$i]['UNI_ORDTYPE'] = 'B';
