@@ -4,9 +4,6 @@ function simply_request_data_func($data)
 {
     $item_warehouse = '75';
     $data['DETAILS'] = 'MED-' . $data['BOOKNUM'];
-    if ($data['doctype'] == 'TINVOICES') {
-        $data['BOOKNUM'] = $data['DETAILS'];
-    }
     $data['UNI_ORDTYPE'] = 'B';
     $data['UNI_DUEDATE'] = date('Y-m-d');
     $data['UFLR_ORDERRCVCODE'] = '25';
@@ -20,4 +17,12 @@ function simply_request_data_func($data)
     unset($data['PAYMENTDEF_SUBFORM']['EMAIL']);
     return $data;
 
+}
+
+add_filter('simply_request_data_receipt', 'simply_request_data_receipt_func');
+function simply_request_data_receipt_func($data)
+{
+    $data['DETAILS'] = 'MED-' . $data['BOOKNUM'];
+    $data['BOOKNUM'] = $data['DETAILS'];
+    return $data;
 }
