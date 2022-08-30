@@ -49,29 +49,29 @@ add_filter('simply_modify_customer_number', 'simply_modify_customer_number_func'
 function simply_modify_customer_number_func($cust_data)
 {
     $cust_user = '';
-    $order = $cust_data[0];
+    $order = $cust_data['order'];
     $currency = get_post_meta($order->get_id(), '_order_currency', true);
     switch ($currency) {
-        case  'USD';
-            $cust_user = 77;
+        case  "USD";
+            $cust_user = "77";
             break;
-        case  'EUR';
-            $cust_user = 78;
+        case  "EUR";
+            $cust_user = "78";
             break;
-        case  'AUD';
-            $cust_user = 79;
+        case  "AUD";
+            $cust_user = "79";
             break;
-        case  'CAD';
-            $cust_user = 292;
+        case  "CAD";
+            $cust_user = "292";
             break;
-        case  'GBP';
-            $cust_user = 291;
+        case  "GBP";
+            $cust_user = "291";
             break;
-        case  'ILS';
-            $cust_user = 76;
+        case  "ILS";
+            $cust_user = "76";
             break;
     }
-    $cust_data[1] = $cust_user;
+    $cust_data['CUSTNAME'] = $cust_user;
     return $cust_data;
 }
 
