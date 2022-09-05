@@ -27,14 +27,6 @@ function ui_new_role()
 
 add_action('admin_init', 'ui_new_role');
 
-function register_my_session()
-{
-    if (!session_id()) {
-        session_start();
-    }
-}
-
-add_action('init', 'register_my_session');
 
 add_filter('simply_priority_customer_number_obligo', 'simply_priority_customer_number_obligo');
 function simply_priority_customer_number_obligo($current_user)
