@@ -7,6 +7,21 @@ function simply_request_data_func($data)
 {
     $id = $data["orderId"];
     $order = new \WC_Order($id);
+    $warehouseId = get_post_meta($id, 'warehouseId', true);
+    if (!empty($warehouseId)) {
+        switch ($warehouseId) {
+            case "275357";
+                $warehousename = "Ful";
+                break;
+            case "277427";
+                $warehousename = "Gre";
+                break;
+            case "393335";
+                $warehousename = "SbTx";
+                break;
+        }
+        $data['WARHSNAME'] = $warehousename;
+    }
     if (get_post_meta($order->get_id(), '_billing_country', true) != 'IL') {
         if ($data['doctype'] == 'ORDERS') {
             $i = 0;
