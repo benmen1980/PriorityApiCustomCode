@@ -1,4 +1,7 @@
 <?php
+
+use PriorityWoocommerceAPI\WooAPI;
+
 function sync_product_attachemtns()
 {
     /*
@@ -10,21 +13,21 @@ function sync_product_attachemtns()
     * the function ignore other file extensions
     * you cant anyway attach files that are not images
     */
-    $raw_option = $this->option('sync_items_priority_config');
+    $raw_option = WooAPI::instance()->option('sync_items_priority_config');
     $raw_option = str_replace(array("\n", "\t", "\r"), '', $raw_option);
     $config = json_decode(stripslashes($raw_option));
     $search_field = (!empty($config->search_by) ? $config->search_by : 'PARTNAME');
     $search_field_web = (!empty($config->search_field_web) ? $config->search_field_web : '_sku');
     ob_start();
     //$allowed_sufix = ['jpg', 'jpeg', 'png'];
-    $daysback = 9;
+    $daysback = 15;
     $stamp = mktime(0 - $daysback * 24, 0, 0);
     $bod = date(DATE_ATOM, $stamp);
     $search_field_select = $search_field == 'PARTNAME' ? $search_field : $search_field . ',PARTNAME';
-    $response = $this->makeRequest('GET',
+    $response = WooAPI::instance()->makeRequest('GET',
         'LOGPART?$filter=UDATE ge ' . urlencode($bod) . ' and EXTFILEFLAG eq \'Y\' &$select=' . $search_field_select . '&$expand=PARTEXTFILE_SUBFORM($select=EXTFILENAME,EXTFILEDES,SUFFIX;$filter=SUFFIX eq \'png\' or SUFFIX eq \'jpeg\' or SUFFIX eq \'jpg\')'
-        , [], $this->option('log_attachments_priority', true));
-    $priority_version = (float)$this->option('priority-version');
+        , [], WooAPI::instance()->option('log_attachments_priority', true));
+    $priority_version = (float)WooAPI::instance()->option('priority-version');
     $response_data = json_decode($response['body_raw'], true);
     foreach ($response_data['value'] as $item) {
         $search_by_value = $item[$search_field];
@@ -58,7 +61,7 @@ function sync_product_attachemtns()
             $is_uri = strpos('1' . $file_path, 'http') ? false : true;
             if (!empty($file_path)) {
                 $file_ext = $attachment['SUFFIX'];
-                $images_url = 'https://' . $this->option('url') . '/zoom/primail';
+                $images_url = 'https://' . WooAPI::instance()->option('url') . '/zoom/primail';
                 $image_base_url = $config->image_base_url;
                 if (!empty($image_base_url)) {
                     $images_url = $image_base_url;
@@ -95,7 +98,7 @@ function sync_product_attachemtns()
                     }
 
                     echo 'File ' . $file_path . ' not exsits, downloading from ' . $images_url, '<br>';
-                    $file = $this->save_uri_as_image($product_full_url, $attachment['EXTFILENAME']);
+                    $file = WooAPI::instance()->save_uri_as_image($product_full_url, $attachment['EXTFILENAME']);
                     $attach_id = $file[0];
                     $file_name = $file[1];
                 }
@@ -124,18 +127,18 @@ function sync_product_attachemtns()
 
 function sync_product_attachemtns_pdf()
 {
-    $raw_option = $this->option('sync_items_priority_config');
+    $raw_option = WooAPI::instance()->option('sync_items_priority_config');
     $raw_option = str_replace(array("\n", "\t", "\r"), '', $raw_option);
     $config = json_decode(stripslashes($raw_option));
     $search_field = (!empty($config->search_by) ? $config->search_by : 'PARTNAME');
     $search_field_web = (!empty($config->search_field_web) ? $config->search_field_web : '_sku');
     $search_field_select = $search_field == 'PARTNAME' ? $search_field : $search_field . ',PARTNAME';
-    $daysback = 9;
+    $daysback = 15;
     $stamp = mktime(0 - $daysback * 24, 0, 0);
     $bod = date(DATE_ATOM, $stamp);
     ob_start();
     $sufix = 'pdf';
-    $response = $this->makeRequest('GET', 'LOGPART?$filter=UDATE ge ' . urlencode($bod) . ' and EXTFILEFLAG eq \'Y\' &$select=' . $search_field_select . '&$expand=PARTEXTFILE_SUBFORM($select=EXTFILENAME;$filter=SUFFIX eq \'pdf\')');
+    $response = WooAPI::instance()->makeRequest('GET', 'LOGPART?$filter=UDATE ge ' . urlencode($bod) . ' and EXTFILEFLAG eq \'Y\' &$select=' . $search_field_select . '&$expand=PARTEXTFILE_SUBFORM($select=EXTFILENAME;$filter=SUFFIX eq \'pdf\')');
     $response_data = json_decode($response['body_raw'], true);
     foreach ($response_data['value'] as $item) {
         $search_by_value = (string)$item[$search_field];
@@ -167,7 +170,7 @@ function sync_product_attachemtns_pdf()
             $file_name = $file_info['basename'];
             $is_existing_file = false;
             // check if the item exists in media
-            //$id = $this->simply_check_file_exists($file_name);
+            //$id = WooAPI::instance()->simply_check_file_exists($file_name);
             global $wpdb;
             $file_n = 'simplyCT/' . $sku . '.' . $sufix;
             $id = $wpdb->get_var("SELECT post_id FROM $wpdb->postmeta WHERE meta_value like  '%$file_n' AND meta_key = '_wp_attached_file'");
@@ -179,7 +182,7 @@ function sync_product_attachemtns_pdf()
 
             } // if is a new file, download from Priority and push to array
             else if ($is_existing_file !== true) {
-                $pdf_url = 'https://' . $this->option('url') . '/pri/primail';
+                $pdf_url = 'https://' . WooAPI::instance()->option('url') . '/pri/primail';
                 echo 'File ' . $file_path . ' not exsits, downloading from ' . $pdf_url, '<br>';
                 $priority_image_path = $file_path;
                 $priority_image_path = str_replace('\\', '/', $priority_image_path);
