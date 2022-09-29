@@ -96,3 +96,9 @@ function simply_set_priority_sku_field_func($fieldname)
     $fieldname = 'BARCODE';
     return $fieldname;
 }
+add_filter('simplyct_sendEmail', 'simplyct_sendEmail_func');
+function simplyct_sendEmail_func($send)
+{
+    array_push($send, 'rachel@particleformen.com');
+    return $send;
+}
