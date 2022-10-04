@@ -20,7 +20,8 @@ function simply_request_data_func($data)
                     'PARTNAME' => $str[0],
                     'TQUANT' => (int)$str[2],
                     'VPRICE' => (int)$str[1],
-                    'DUEDATE' => date('Y-m-d')
+                    'DUEDATE' => date('Y-m-d'),
+                    'DISCOUNT' => $str[3] // this is how I want to pull the discount if any
                 ];
         }
     }
