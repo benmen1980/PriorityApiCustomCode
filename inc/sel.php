@@ -222,7 +222,7 @@ function simply_syncItemsPriority_item_func($item)
     $content = '';
     if (isset($item['SELK_WEBTEXT_SUBFORM'])) {
         foreach ($item['SELK_WEBTEXT_SUBFORM'] as $text) {
-            $content .= $text["TEXT"];
+            $content .= '<br/>'.$text["TEXT"];
         }
     }
     if (!empty($content)) {
