@@ -7,6 +7,7 @@ function simply_modify_url($params)
     $statusdate = $params['args']['statusdate'];
     $url_addition_config = $params['args']['url_addition_config'];
     // manipulate url...
+    $statusdate = 'ACTE_UDATECUST';
     $new_url = $url_addition = 'CUSTOMERS?$filter=EMAIL ne \'\' and ' . $statusdate . ' ge ' . $bod . ' ' . $url_addition_config . '&$select=CUSTNAME,MCUSTNAME,ADDRESS,ADDRESS2,STATE,ZIP,PHONE,SPEC1,SPEC2&$expand=CUSTPLIST_SUBFORM($select=PLNAME),CUSTDISCOUNT_SUBFORM($select=PERCENT),CUSTPERSONNEL_SUBFORM($filter=PERP_ONLINEACCESS eq \'Y\';$select=NAME,EMAIL)';
     //
     $params['url_addition'] = $new_url;
