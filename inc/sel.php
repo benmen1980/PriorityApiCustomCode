@@ -246,6 +246,14 @@ function simply_syncItemsPriority_item_func($item)
         }
     }
     update_post_meta($id, 'product_technical_details', $content);
+
+    /* update video */
+    $content = '';
+    if (sizeof($item['SELK_PARTLINKS_SUBFORM'])>0) {
+        $content = $item['SELK_PARTLINKS_SUBFORM'][0]['HOSTNAME'];
+    }
+    update_post_meta($id, 'product_video', $content);
+    /**/
     return $item;
 }
 
@@ -253,7 +261,7 @@ add_filter('simply_syncItemsPriority_data', 'simply_syncItemsPriority_data_func'
 function simply_syncItemsPriority_data_func($data)
 {
     $data['select'] .= ',SELK_MARKETINGDES';
-    $data['expand'] .= ',INTERNALDIALOGTEXT_SUBFORM,SELK_WEBTEXT_SUBFORM';
+    $data['expand'] .= ',INTERNALDIALOGTEXT_SUBFORM,SELK_WEBTEXT_SUBFORM,SELK_PARTLINKS_SUBFORM';
     return $data;
 }
 
