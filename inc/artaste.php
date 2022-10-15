@@ -1,10 +1,8 @@
 <?php
 use PriorityWoocommerceAPI\WooAPI;
 
-
 add_filter('simply_request_data', 'simply_func');
 function simply_func($data)
-
 {
     if($data['doctype']=='ORDERS') {
         // CURDATE = PDATE
@@ -34,5 +32,32 @@ function simply_func($data)
         $data['DETAILS'] = $CPROFNUM;
         unset($data['IVDATE']);
     }
+    return $data;
+}
+
+// search CUSTNAME by email or vat num, input is array user_id or  order object
+add_filter('simply_search_customer_in_priority','simply_search_customer_in_priority');
+function simply_search_customer_in_priority($data){
+    $order = $data['order'];
+    $user_id = $data['user_id'];
+    if($order){
+        $email =  $order->get_billing_email();
+    }
+    if($user_id) {
+        if ($user = get_userdata($user_id)) {
+            $email = $user->data->user_email;
+        }
+    }
+    //check if customer already exist in priority
+    $url_addition = 'CUSTOMERS?$filter=EMAIL eq \''.$email.'\'' ;
+    $res =  WooAPI::instance()->makeRequest('GET', $url_addition, [], true);
+    if($res['code']==200){
+        $body =   json_decode($res['body']);
+        $value = $body->value[0];
+        $custname =$value->CUSTNAME;
+    }else{
+        $custname = null;
+    }
+    $data['CUSTNAME'] = $custname;
     return $data;
 }
