@@ -299,3 +299,47 @@ if (!wp_next_scheduled('syncInventory_cron_hook')) {
     $res = wp_schedule_event(time(), 'one_hour', 'syncInventory_cron_hook');
 
 }
+
+//send email if order not sync
+
+function check_order_not_sync_cron(){
+
+    $date_from = date('Y-m-d', strtotime('-1 days'));
+    $date_to = date("Y-m-d");
+
+    $query = new \WC_Order_Query(array(
+        'limit' => -1,
+        'orderby' => 'date',
+        'order' => 'DESC',
+        'return' => 'ids',
+        'status'=> array( 'wc-processing'),
+        'date_created'=> $date_from .'...'. $date_to, 
+        'meta_key' => 'priority_order_number', // The postmeta key field
+        'meta_compare' => 'NOT EXISTS', // The comparison argument
+    ));
+
+    $orders = $query->get_orders();
+    if(!empty($orders)){
+        $orders = implode(", ", $orders);
+
+        $multiple_recipients = array(
+            'neomi@segalbaby.co.il',
+        );
+        $subj = 'Orders that were not synchronized in the previous day';
+        $body = 'The Orders id are:';
+        $body.= $orders;
+        wp_mail( $multiple_recipients, $subj, $body );
+    }
+
+
+}
+
+add_action('check_order_not_sync_cron_hook', 'check_order_not_sync_cron');
+
+if (!wp_next_scheduled('check_order_not_sync_cron_hook')) {
+    $local_time_to_run = 'midnight';
+    $timestamp = strtotime( $local_time_to_run ) - ( get_option( 'gmt_offset' ) * HOUR_IN_SECONDS );
+    $res = wp_schedule_event(time(), 'daily', 'check_order_not_sync_cron_hook');
+
+}
+
