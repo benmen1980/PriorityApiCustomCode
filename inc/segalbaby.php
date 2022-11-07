@@ -215,7 +215,7 @@ function simply_func_syncInventory_cron()
 
 {
 
-    $response = WooAPI::instance()->makeRequest('GET', 'LOGPART?$select =PARTNAME,LAVI_TOTINVWEB&$filter=and SHOWINWEB eq \'Y\'', [], WooAPI::instance()->option('log_inventory_priority', false));
+    $response = WooAPI::instance()->makeRequest('GET', 'LOGPART?$select=PARTNAME,LAVI_TOTINVWEB&$filter=SHOWINWEB eq \'Y\'', [], WooAPI::instance()->option('log_inventory_priority', false));
     // check response status        // check response status
     // check response status
 
