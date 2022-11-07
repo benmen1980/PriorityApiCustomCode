@@ -90,3 +90,18 @@ function my_custom_checkout_field_update_order_meta($order_id)
 }
 
 add_action('woocommerce_checkout_update_order_meta', 'my_custom_checkout_field_update_order_meta');
+// agents
+function register_my_session()
+{
+    if (!session_id()) {
+        session_start();
+    }
+}
+add_action('init', 'register_my_session');
+
+// add the dropdown to the menu
+add_filter( 'wp_nav_menu_items', 'simply_add_menu_item_html', 10, 2 );
+function simply_add_menu_item_html( $items, $args ) {
+    $items .= '<li>'.do_shortcode('[select_users add_agent_to_drop_down=false]').'</li>';
+    return $items;
+}
