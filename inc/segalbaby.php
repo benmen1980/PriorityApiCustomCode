@@ -1,14 +1,18 @@
 <?php
+
+// SimplyCT.co.il
+
 add_filter('simply_request_data', 'simply_func');
+
 function simply_func($data)
 
 {
 
-    $items = [];
+       $items = [];
 
     foreach ($data['ORDERITEMS_SUBFORM'] as $item) {
 
-        $vatprice = $item['VATPRICE'];
+        $vatprice= $item['VATPRICE'];
 
         unset($item['VATPRICE']);
 
@@ -18,7 +22,7 @@ function simply_func($data)
 
         unset($item['TQUANT']);
 
-        $item['VATPRICE'] = $vatprice;
+        $item['VATPRICE']=$vatprice;
 
         $items[] = $item;
 
@@ -31,8 +35,36 @@ function simply_func($data)
     return $data;
 
 }
+
+add_filter('simply_syncInventoryPriority_data', 'simply_syncInventoryPriority_data_func');
+
+function simply_syncInventoryPriority_data_func($data)
+
+{
+
+    $data['select'] = 'PARTNAME,LAVI_TOTINVWEB,VATPRICE';
+
+    return $data;
+
+}
+
+
+
+add_filter('simply_sync_inventory_priority', 'simply_sync_inventory_priority');
+
+function simply_sync_inventory_priority($data)
+
+{
+
+    $data['stock'] = $data['LAVI_TOTINVWEB'];
+
+    unset($data['LAVI_TOTINVWEB']);
+
+    return $data;
+
+}
 //cron
-//syncItemsPriority
+
 add_filter('simply_syncItemsPriority_item', 'simply_sync_items_to_priority');
 
 function simply_sync_items_to_priority($data)
@@ -46,13 +78,12 @@ function simply_sync_items_to_priority($data)
     return $data;
 
 }
-
-add_filter('simply_request_data', 'simply_request_data_func');
+add_filter('simply_request_data','simply_request_data_func');
 function simply_request_data_func($data)
 {
-    $orderId = $data["orderId"];
-    $v = get_post_meta($orderId, '_billing_phone_2', true);
-    $data['SHIPTO2_SUBFORM']['FAX'] = $v;
+    $orderId=$data["orderId"];
+    $v=get_post_meta($orderId,'_billing_phone_2',true);
+    $data['SHIPTO2_SUBFORM']['FAX']=$v;
     return $data;
 
 }
@@ -69,7 +100,6 @@ function simply_data($data)
     return $data;
 
 }
-
 use PriorityWoocommerceAPI\WooAPI;
 
 function simply_func_syncItem_cron()
@@ -90,7 +120,7 @@ function simply_func_syncItem_cron()
 
     $raw_option = WooAPI::instance()->option('sync_items_priority_config');
 
-    $raw_option = str_replace(array("\n", "\t", "\r"), '', $raw_option);
+    $raw_option = str_replace(array( "\n", "\t", "\r"), '', $raw_option);
 
     $config = json_decode(stripslashes($raw_option));
 
@@ -104,39 +134,40 @@ function simply_func_syncItem_cron()
 
     // get the items simply by time stamp of today
 
-    $stamp = mktime(0 - $daysback * 24, 0, 0);
+    $stamp = mktime(0 - $daysback*24, 0, 0);
 
-    $bod = date(DATE_ATOM, $stamp);
+    $bod = date(DATE_ATOM,$stamp);
 
-    $date_filter = 'UDATE ge ' . urlencode($bod);
+    $date_filter = 'UDATE ge '.urlencode($bod);
 
     $data['select'] = 'PARTNAME,BASEPLPRICE,VATPRICE';
 
-    $data = apply_filters('simply_syncItemsPriority_data', $data);
+    $data = apply_filters( 'simply_syncItemsPriority_data', $data );
 
-    $response = WooAPI::instance()->makeRequest('GET', 'LOGPART?$select=' . $data['select'] . '&$filter=' . $date_filter . ' ' . $url_addition_config . '&$expand=PARTUNSPECS_SUBFORM,PARTTEXT_SUBFORM', [], WooAPI::instance()->option('log_items_priority', true));
+    $response = WooAPI::instance()->makeRequest('GET', 'LOGPART?$select='.$data['select'].'&$filter='.$date_filter.' '.$url_addition_config.'&$expand=PARTUNSPECS_SUBFORM,PARTTEXT_SUBFORM',[], WooAPI::instance()->option('log_items_priority', true));
 
     // check response status
 
     if ($response['status']) {
 
         $response_data = json_decode($response['body_raw'], true);
-        foreach ($response_data['value'] as $item) {
+         foreach($response_data['value'] as $item)
+        {
             // if product exsits, update price
             $search_by_value = $item[$search_field];
             $args = array(
 
-                'post_type' => array('product', 'product_variation'),
+                'post_type'		=>	array('product', 'product_variation'),
 
-                'post_status' => array('publish', 'draft'),
+                'post_status' => array('publish',  'draft'),
 
-                'meta_query' => array(
+                'meta_query'	=>	array(
 
                     array(
 
-                        'key' => '_sku',
+                        'key'       => '_sku',
 
-                        'value' => $search_by_value
+                        'value'	=>	$search_by_value
 
                     )
 
@@ -145,10 +176,10 @@ function simply_func_syncItem_cron()
             );
 
             $product_id = 0;
-            $my_query = new \WP_Query($args);
-            if ($my_query->have_posts()) {
+            $my_query = new \WP_Query( $args );
+            if ( $my_query->have_posts() ) {
 
-                while ($my_query->have_posts()) {
+                while ( $my_query->have_posts() ) {
 
                     $my_query->the_post();
 
@@ -157,12 +188,13 @@ function simply_func_syncItem_cron()
                 }
             }
             // if product variation skip
-            if ($product_id != 0) {
-                $item = apply_filters('simply_syncItemsPriority_item', $item);
+            if ($product_id != 0)
+            {
+                $item = apply_filters( 'simply_syncItemsPriority_item', $item );
 
                 $pri_price = WooAPI::instance()->option('price_method') == true ? $item['VATPRICE'] : $item['BASEPLPRICE'];
 
-                $my_product = new \WC_Product($product_id);
+                $my_product = new \WC_Product( $product_id );
 
                 $my_product->set_regular_price($pri_price);
 
@@ -172,7 +204,8 @@ function simply_func_syncItem_cron()
         // add timestamp
 
         WooAPI::instance()->updateOption('items_priority_update', time());
-    } else {
+    }
+    else {
 
         WooAPI::instance()->sendEmailError(
 
@@ -187,26 +220,23 @@ function simply_func_syncItem_cron()
     return $response;
 
 }
-
-add_filter('cron_schedules', 'example_add_cron_interval');
-function example_add_cron_interval($schedules)
-{
+add_filter( 'cron_schedules', 'example_add_cron_interval' );
+function example_add_cron_interval( $schedules ) {
 
     $schedules['one_hour'] = array(
 
         'interval' => 3600,
 
-        'display' => esc_html__('Every Hour One'),);
+        'display'  => esc_html__( 'Every Hour One' ), );
 
     return $schedules;
 
 }
+add_action( 'simply_cron_hook', 'simply_func_syncItem_cron' );
 
-add_action('simply_cron_hook', 'simply_func_syncItem_cron');
+if ( ! wp_next_scheduled( 'simply_cron_hook' ) ) {
 
-if (!wp_next_scheduled('simply_cron_hook')) {
-
-    $res = wp_schedule_event(time(), 'one_hour', 'simply_cron_hook');
+    $res = wp_schedule_event( time(), 'one_hour', 'simply_cron_hook' );
 
 }
 
@@ -343,3 +373,5 @@ if (!wp_next_scheduled('check_order_not_sync_cron_hook')) {
 
 }
 
+
+?>
