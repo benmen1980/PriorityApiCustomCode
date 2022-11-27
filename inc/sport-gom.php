@@ -105,3 +105,10 @@ function simply_add_menu_item_html( $items, $args ) {
     $items .= '<li>'.do_shortcode('[select_users add_agent_to_drop_down=false]').'</li>';
     return $items;
 }
+function simply_code_after_sync_inventory($product_id,$item){
+    // update the ACF with the item data
+    $sales_order = $item['LOGCOUNTERS_SUBFORM'][0]['ORDERS'];
+    $purchase_order = $item['LOGCOUNTERS_SUBFORM'][0]['PORDERS'];
+    // here you need to update the data
+    return null;
+}

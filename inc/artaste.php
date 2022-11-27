@@ -12,10 +12,14 @@ function simply_func($data)
         $order = new \WC_Order($order_id);
         $data['REFERENCE']= $order->get_meta('טווח שעות');
         $date_text = $order->get_meta('תאריך');
-        $datetime = DateTime::createFromFormat('d/m/y', $date_text);
-        $data['EXPIRYDATE'] = $datetime->format('Y-m-d');
-        $data['DETAILS'] = '#'.$data['DETAILS'];
+        if(is_null(!$date_text)){
+            $datetime = DateTime::createFromFormat('d/m/y', $date_text);
+            $data['EXPIRYDATE'] = $datetime->format('Y-m-d');
+            $data['DETAILS'] = '#'.$data['DETAILS'];
+        }
+
         unset($data['CURDATE']);
+        unset($data['CDES']);
         // ORDERSTEXT_SUBFORM replace with CPROFTEXT
         $data = WooAPI::instance()->change_key($data, 'ORDERSTEXT_SUBFORM', 'CPROFTEXT_SUBFORM');
         // CPROFCONT

@@ -6,6 +6,8 @@ function simply_request_data_func($data)
 {
     $id_order = $data["orderId"];
     $order = new \WC_Order($id_order);
+   // $data['REFERENCE'] = $data['BOOKNUM'];
+  //  unset($data['BOOKNUM']);
     //$i = sizeof($data['ORDERITEMS_SUBFORM']) - 1;
     $i = 0;
     foreach ($order->get_items() as $item) {
