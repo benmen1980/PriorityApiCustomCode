@@ -12,7 +12,7 @@ function simply_func($data)
         $order = new \WC_Order($order_id);
         $data['REFERENCE']= $order->get_meta('טווח שעות');
         $date_text = $order->get_meta('תאריך');
-        if(is_null(!$date_text)){
+        if(!is_null($date_text)){
             $datetime = DateTime::createFromFormat('d/m/y', $date_text);
             $data['EXPIRYDATE'] = $datetime->format('Y-m-d');
             $data['DETAILS'] = '#'.$data['DETAILS'];
