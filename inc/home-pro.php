@@ -9,7 +9,8 @@ function simply_request_data_func($data)
 {
     $id_order = $data["orderId"];
     $order = new \WC_Order($id_order);
-    $data['REFERENCE'] = $data['BOOKNUM'];
-    unset($data['BOOKNUM']);
+    $data['SHIPTO2_SUBFORM']['CUSTDES'] = $data['CDES'];
+    $data['WARHSNAME'] = '90';
+    $data['STCODE'] = '107';
     return $data;
 }
