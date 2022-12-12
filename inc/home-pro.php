@@ -16,7 +16,6 @@ function simply_request_data_func($data)
     return $data;
 }
 add_action('HomeProSyncPricePriority', 'HomeProSyncPricePriority');
-
 function HomeProSyncPricePriority()
 {
     $product_price_list = '3'; // need to change to 199
