@@ -90,45 +90,70 @@ function my_custom_checkout_field_update_order_meta($order_id)
 }
 
 add_action('woocommerce_checkout_update_order_meta', 'my_custom_checkout_field_update_order_meta');
+
 // agents
-function register_my_session()
-{
-    if (!session_id()) {
-        session_start();
-    }
-}
-add_action('init', 'register_my_session');
+
 
 // add the dropdown to the menu
-add_filter( 'wp_nav_menu_items', 'simply_add_menu_item_html', 10, 2 );
-function simply_add_menu_item_html( $items, $args ) {
-    $items .= '<li>'.do_shortcode('[select_users add_agent_to_drop_down=false]').'</li>';
-    return $items;
-}
-function simply_code_after_sync_inventory($product_id,$item){
-    // update the ACF with the item data
-    $sales_order = $item['LOGCOUNTERS_SUBFORM'][0]['ORDERS'];
-    $purchase_order = $item['LOGCOUNTERS_SUBFORM'][0]['PORDERS'];
-    // here you need to update the data
-    return null;
+//add_filter( 'wp_nav_menu_items', 'simply_add_menu_item_html', 10, 2 );
+//function simply_add_menu_item_html( $items, $args ) {
+// $items .= '<li>'.do_shortcode('[select_users add_agent_to_drop_down=false]').'</li>';
+// return $items;
+//}
+
+
+// sync variations
+add_filter('simply_ItemsAtrrVariation', 'simply_ItemsAtrrVariation_func');
+function simply_ItemsAtrrVariation_func($item)
+{
+    $attributes['color'] = $item['SPEC2'];
+    $attributes['size'] = $item['SPEC3'];
+    return $attributes;
 }
 
-if(!function_exists('simply_set_ship_class')) {
-    function simply_set_ship_class($product_id, $class_name)
-    {
-        // To get all the shipping classes
-        $shipping_classes = get_terms(array('taxonomy' => 'product_shipping_class', 'hide_empty' => false));
-        foreach ($shipping_classes as $shipping_class) {
-            if ($class_name == $shipping_class->name) {
-                // assign class to product
-                $product = wc_get_product($product_id); // Get an instance of the WC_Product Object
-                $product->set_shipping_class_id($shipping_class->term_id); // Set the shipping class ID
-                $product->save(); // Save the product data to database
-            }
-        }
+// update order item by cart item data
+add_action('woocommerce_checkout_create_order_line_item', 'simply_field_update_order_item_meta', 20, 4);
+function simply_field_update_order_item_meta($item, $cart_item_key, $values, $order)
+{
+    if (!isset($values['names']))
+        return;
+    $custom_data = $values['names'];
+    $item->update_meta_data('sportgom_names', $custom_data);
+}
+
+
+// add names to post to Priority
+add_filter('simply_modify_orderitem','simply_modify_orderitem');
+function simply_modify_orderitem($array){
+    $data = $array['data'];
+    $item = $array['item'];
+    $text = '';
+    $index = 1;
+    foreach ($item->get_meta('sportgom_names') as $name){
+        $text .= '['.$index.'] מספר: '. $name['number'].' שם: '.$name['name'].'<br>';
+        $index++;
     }
+// $text = $item->get_meta('sportgom_names');
+    $data['ORDERITEMS_SUBFORM'][sizeof($data['ORDERITEMS_SUBFORM']) - 1]['PARTNAME'] = '000'; // debug only
+    $data['ORDERITEMS_SUBFORM'][sizeof($data['ORDERITEMS_SUBFORM']) - 1]['ORDERITEMSTEXT_SUBFORM'] = ['TEXT' => $text];
+    return $data;
 }
 
-add_action('simply_update_product_data',function($item){
-    simply_set_ship_class($item['product_id'],$item['SPEC19']);
-});
+function simply_code_after_sync_inventory($product_id,$item){
+
+    $stock = $item['LOGCOUNTERS_SUBFORM'][0]['BALANCE'];
+    $item['stock'] = $stock;
+    $item = apply_filters('simply_sync_inventory_priority', $item);
+    $stock = $item['stock'];
+    update_post_meta($product_id, '_stock', $stock);
+
+// update the ACF with the item data
+    $purchase_order = $item['LOGCOUNTERS_SUBFORM'][0]['PORDERS'];
+    $sales_order = $item['LOGCOUNTERS_SUBFORM'][0]['ORDERS'];
+    if ( isset( $purchase_order ) ) {
+        update_post_meta($product_id, 'order_priority', esc_attr($purchase_order));
+    }
+    if ( isset( $sales_order ) ) update_post_meta( $product_id, 'more_order_priority', esc_attr( $sales_order ) );
+// here you need to update the data
+    return null;
+    }
