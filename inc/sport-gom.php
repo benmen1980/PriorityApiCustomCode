@@ -108,7 +108,8 @@ function simply_ItemsAtrrVariation_func($item)
 {
     $attributes['color'] = $item['SPEC2'];
     $attributes['size'] = $item['SPEC3'];
-    return $attributes;
+    $item['attributes'] = $attributes;
+    return $item;
 }
 
 // update order item by cart item data
