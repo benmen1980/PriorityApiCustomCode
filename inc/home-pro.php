@@ -18,7 +18,7 @@ function simply_request_data_func($data)
 add_action('HomeProSyncPricePriority', 'HomeProSyncPricePriority');
 function HomeProSyncPricePriority()
 {
-    $product_price_list = '3'; // need to change to 199
+    $product_price_list = '199'; // need to change to 199
     $response = WooAPI::instance()->makeRequest('GET', 'PRICELIST?$select=PLNAME&$filter=PLNAME eq \'' . $product_price_list . '\'&$expand=PARTPRICE2_SUBFORM'
         , [], WooAPI::instance()->option('log_items_priority', true));
     if ($response['status']) {
