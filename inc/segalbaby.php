@@ -1,14 +1,51 @@
 <?php
 
 // SimplyCT.co.il
-
 add_filter('simply_request_data', 'simply_func');
 
-function simply_func($data)
+function simply_func($data){
+    //var_dump($data);
+    $id_order = $data["orderId"];
+    $order = new \WC_Order($id_order);
+    $i = sizeof($data['ORDERITEMS_SUBFORM']);
+    foreach ($order->get_items() as $item) {
+        $formatted_meta_data = $item->get_formatted_meta_data( '_', true );
+        if(!empty($formatted_meta_data)){
+            foreach($data['ORDERITEMS_SUBFORM'] as $item ){
+                if($item['PERCENT'] < 0){
+                    unset($item['PERCENT']);
+                }
+                $items[] = $item;
+                $data['ORDERITEMS_SUBFORM'] = $items;
+            }
+            foreach($formatted_meta_data as $formatted_data){
+                $data_details = explode(")", $formatted_data->value);
+                foreach($data_details as $data_item){
+                    if(!empty($data_item)){
+                        $data_item = explode("|", $data_item);
+                        $pdt_id = url_to_postid($data_item[2]);
+                        $product = wc_get_product(  $pdt_id );
+                        if( $product instanceof WC_Product ){
+                            $sku = $product->get_sku();
+                            $price = $product->get_price();
+                        }
+                        $qtty = intval(trim($data_item[1], ' x'));
+                        $data['ORDERITEMS_SUBFORM'][$i++] =[
+                            'PARTNAME' => $sku,
+                            'TQUANT' => $qtty,
+                            'VPRICE' => (float)$price,
+                            'DUEDATE' => date('Y-m-d'),
+                            
+                        ];
+           
+                    }
+                    
+                } 
+            }
+        }
+    }
 
-{
-
-       $items = [];
+    $items = [];
 
     foreach ($data['ORDERITEMS_SUBFORM'] as $item) {
 
@@ -22,7 +59,7 @@ function simply_func($data)
 
         unset($item['TQUANT']);
 
-        $item['VATPRICE']=$vatprice;
+        $item['VATPRICE']= $vatprice;
 
         $items[] = $item;
 
@@ -31,7 +68,6 @@ function simply_func($data)
     unset($data['ORDERITEMS_SUBFORM']);
 
     $data['ORDERITEMS_SUBFORM'] = $items;
-
     return $data;
 
 }
@@ -334,7 +370,7 @@ if (!wp_next_scheduled('syncInventory_cron_hook')) {
 
 function check_order_not_sync_cron(){
 
-    $date_from = date('Y-m-d', strtotime('-1 days'));
+    $date_from = date('Y-m-d', strtotime('-3 days'));
     $date_to = date("Y-m-d");
 
     $query = new \WC_Order_Query(array(
@@ -353,6 +389,7 @@ function check_order_not_sync_cron(){
         $orders = implode(", ", $orders);
 
         $multiple_recipients = array(
+            'elisheva.g@simplyct.co.il',
             'neomi@segalbaby.co.il',
         );
         $subj = 'Orders that were not synchronized in the previous day';
@@ -367,8 +404,8 @@ function check_order_not_sync_cron(){
 add_action('check_order_not_sync_cron_hook', 'check_order_not_sync_cron');
 
 if (!wp_next_scheduled('check_order_not_sync_cron_hook')) {
-    $local_time_to_run = 'midnight';
-    $timestamp = strtotime( $local_time_to_run ) - ( get_option( 'gmt_offset' ) * HOUR_IN_SECONDS );
+    //$local_time_to_run = 'midnight';
+    //$timestamp = strtotime( $local_time_to_run ) - ( get_option( 'gmt_offset' ) * HOUR_IN_SECONDS );
     $res = wp_schedule_event(time(), 'daily', 'check_order_not_sync_cron_hook');
 
 }
