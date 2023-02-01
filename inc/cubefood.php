@@ -42,5 +42,5 @@ if(!function_exists('simply_set_ship_class')) {
 }
 
 add_action('simply_update_product_data',function($item){
-    simply_set_ship_class($item['product_id'],$item['SPEC19']);
+    simply_set_ship_class($item['product_id'],$item['SPEC7']);
 });
