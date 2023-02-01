@@ -24,17 +24,15 @@ function HomeProSyncPricePriority()
     if ($response['status']) {
         $response_data = json_decode($response['body_raw'], true);
         foreach ($response_data['value'][0]['PARTPRICE2_SUBFORM'] as $item) {
-            // if product exsits, update price
-            if ($item['PARTNAME'] == '0101') {
-                $foo = 'ppp';
-            }
-            $product = new WC_Product(wc_get_product_id_by_sku($item['PARTNAME']));
-            // if product variation skip
-            if ($product) {
-                $pri_price = $item['VATPRICE'];
-                $product->set_sale_price($pri_price);
-                $product->save();
-            }
+	        // if product exsits, update price
+	        $product_id = wc_get_product_id_by_sku($item['PARTNAME']);
+	        // if product variation skip
+	        if ( $product_id > 0  ) {
+		        $product = wc_get_product( $product_id );
+		        $pri_price = $item['VATPRICE'];
+		        $product->set_regular_price( $pri_price );
+		        $product->save();
+	        }
         }
     }
 }
