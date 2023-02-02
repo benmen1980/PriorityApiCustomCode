@@ -4,6 +4,10 @@ use PriorityWoocommerceAPI\WooAPI;
 add_filter('simply_search_customer_in_priority','simply_search_customer_in_priority');
 function simply_search_customer_in_priority($data){
     $order = $data['order'];
+	if(empty($order)){
+		$data['CUSTNAME'] = null;
+		return $data;
+	}
     $user_id = $data['user_id'];
     if($order){
         $email =  $order->get_billing_email();
