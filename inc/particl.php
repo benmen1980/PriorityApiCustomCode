@@ -85,6 +85,18 @@ function simply_modify_customer_number_func($cust_data)
         case  "ILS";
             $cust_user = "76";
             break;
+        case  "BRL";
+            $cust_user = "100001";
+            break;
+        case  "MXN";
+            $cust_user = "100002";
+            break;
+        case  "KRW";
+            $cust_user = "100003";
+            break;
+        case  "JPX";
+            $cust_user = "100004";
+            break;
     }
     $cust_data['CUSTNAME'] = $cust_user;
     return $cust_data;
