@@ -20,6 +20,8 @@ function syncItemsPriorityVariationGant()
     $data['select'] = 'PARTNAME,PARTDES,MPARTNAME,BARCODE,VATPRICE,FAMILYDES,ROYY_EFAMILYDES,SPEC2,EDE_SPECDES2,ROYY_SPECEDES2,SPEC3,EDE_SPECDES3,EDE_SPECDES4,SPEC5,SPEC6,EDE_SPECDES9,SPEC10,ROYY_SPECEDES11,SPEC12,EDE_SPECDES12,ROYY_SPECEDES12,SPEC14,EDE_SPECDES16,EDE_SPECDES18';
     $data['expand'] = '$expand=POS_INTERNETPARTSPEC_SUBFORM($select=SPEC1;),POS_PARTWEBDES_SUBFORM($select=PARTDES1;)';
     $url_addition_config = (!empty($config_v->additional_url) ? $config_v->additional_url : '');
+    $filter = urlencode($url_addition) . ' ' . $url_addition_config;
+    //$filter = 'PARTNAME eq \'20031401132XL\' or PARTNAME eq \'20031401133XL\'';
     $response = WooAPI::instance()->makeRequest('GET','LOGPART?$select=' . $data['select'] . '&$filter=' . $filter . '&' . $data['expand'] . '',
             [], WooAPI::instance()->option('log_items_priority_variation', true));
     // check response status
@@ -175,6 +177,36 @@ function syncItemsPriorityVariationGant()
                         update_field('child_size', $children['child_size'], 'pa_size_'.$term);
                     }
                     unset($parents[$sku_parent]['variation']);
+
+                    $parent_name = $parent['parent_category'];
+                    if (term_exists($parent_name)) {
+                        $parent_term = term_exists( $parent_name, 'product_cat' ); // array is returned if taxonomy is given
+                        $parent_term_id = $parent_term['term_id'];
+                    } else {
+                        if (!empty($parent_name)) {
+                           $parent_cat =  wp_insert_term(
+                            // the name of the category
+                                $parent_name,
+                                // the taxonomy 'category' (don't change)
+                                'product_cat',
+                                array(
+                                    // what to use in the url for term archive
+                                    'slug' => $parent_name
+                                )
+                            );
+                            $parent_term_id = $parent_cat['term_id'];
+                        }
+                    }
+
+                    if (!empty($parent['categories-slug'][0])) {
+                        $terms_id = wp_set_object_terms($product_id,  array($parent['categories-slug'][0],$parent_name), 'product_cat', true);
+                        // update the name of the category
+                        wp_update_term($terms_id[0],'product_cat',array(
+                            'name'=> $parent['categories'][0],
+                            'slug' => $parent['categories-slug'][0],
+                            'parent' => $parent_term_id
+                        ));
+                    }
                 }
 
             }
@@ -185,6 +217,7 @@ function syncItemsPriorityVariationGant()
         $subj = 'check sync item';
         wp_mail( 'elisheva.g@simplyct.co.il', $subj, implode(" ",$response) );
     }
+
     
 }
 
