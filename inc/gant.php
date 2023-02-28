@@ -17,11 +17,9 @@ function syncItemsPriorityVariationGant()
     $bod = date(DATE_ATOM, $stamp);
     $url_addition = 'UDATE ge ' . $bod;
     $search_field = 'PARTNAME';
-    $data['select'] = 'PARTNAME,PARTDES,MPARTNAME,BARCODE,VATPRICE,FAMILYDES,ROYY_EFAMILYDES,SPEC2,EDE_SPECDES2,ROYY_SPECEDES2,SPEC3,EDE_SPECDES3,EDE_SPECDES4,SPEC5,SPEC6,EDE_SPECDES9,SPEC10,EDE_SPECDES11,ROYY_SPECEDES12,SPEC14,EDE_SPECDES16,EDE_SPECDES18';
+    $data['select'] = 'PARTNAME,PARTDES,MPARTNAME,BARCODE,VATPRICE,FAMILYDES,ROYY_EFAMILYDES,SPEC2,EDE_SPECDES2,ROYY_SPECEDES2,SPEC3,EDE_SPECDES3,EDE_SPECDES4,SPEC5,SPEC6,EDE_SPECDES9,SPEC10,ROYY_SPECEDES11,SPEC12,EDE_SPECDES12,ROYY_SPECEDES12,SPEC14,EDE_SPECDES16,EDE_SPECDES18';
     $data['expand'] = '$expand=POS_INTERNETPARTSPEC_SUBFORM($select=SPEC1;),POS_PARTWEBDES_SUBFORM($select=PARTDES1;)';
     $url_addition_config = (!empty($config_v->additional_url) ? $config_v->additional_url : '');
-    $filter = urlencode($url_addition) . ' ' . $url_addition_config;
-    //$filter = 'PARTNAME eq \'G-SHIRT-LS-349\' or PARTNAME eq \'G-SHIRT-LS-349\'';
     $response = WooAPI::instance()->makeRequest('GET','LOGPART?$select=' . $data['select'] . '&$filter=' . $filter . '&' . $data['expand'] . '',
             [], WooAPI::instance()->option('log_items_priority_variation', true));
     // check response status
@@ -42,19 +40,19 @@ function syncItemsPriorityVariationGant()
                     $item['attributes'] = $attributes;
                     
                     if ($attributes) {
-                        //$price = $item['VATPRICE'];
+                        $price = $item['VATPRICE'];
                         $parents[$variation_field] = [
                             'sku' => $variation_field,
                             'title' => (!empty($item['POS_INTERNETPARTSPEC_SUBFORM']['SPEC1'])) ? $item['POS_INTERNETPARTSPEC_SUBFORM']['SPEC1'] : $item['PARTDES'] ,
                             'stock' => 'Y',
                             'variation' => [],
-                            //'regular_price' => $price,
+                            'regular_price' => $price,
                             'parent_category' => $item['ROYY_EFAMILYDES'], //גברים
                             'categories' => [ // i need to have sub category in hebrew
-                                $item['EDE_SPECDES11']
+                                $item['ROYY_SPECEDES11']
                             ],
                             'categories-slug' => [
-                                $item['EDE_SPECDES11'] .'-'.$item['ROYY_EFAMILYDES']
+                                $item['ROYY_SPECEDES11'] .'-'.$item['ROYY_EFAMILYDES']
                             ]
                         ];
                         if (!empty($show_in_web)) {
@@ -62,7 +60,7 @@ function syncItemsPriorityVariationGant()
                         }
                         $childrens[$variation_field][$search_by_value] = [
                             'sku' => $search_by_value,
-                            //'regular_price' => $price,
+                            'regular_price' => $price,
                             'stock' => 'Y',
                             'parent_title' => $item['POS_INTERNETPARTSPEC_SUBFORM']['SPEC1'],
                             'title' => $item['POS_INTERNETPARTSPEC_SUBFORM']['SPEC1'],
@@ -79,14 +77,14 @@ function syncItemsPriorityVariationGant()
                             'season' => $item['SPEC6'],
                             'concept' => $item['EDE_SPECDES9'],
                             'cut' => $item['SPEC10'],
-                            'sub_cat' => $item['EDE_SPECDES11'], //missing it's parameter 11- i need it in hebrew
+                            'sub_cat' => $item['ROYY_SPECEDES11'], //missing it's parameter 11- i need it in hebrew
                             'cat' => $item['ROYY_EFAMILYDES'], //גברים
-                            //'fabric' => $item['SPEC12'],
-                            //'fabric_desc' => $item['EDE_SPECDES12'],
+                            'fabric' => $item['SPEC12'],
+                            'fabric_desc' => $item['EDE_SPECDES12'],
                             'made_in' => $item['SPEC14'],
                             'sleeve_type' => $item['EDE_SPECDES18'],
                             'sub_group_jersey' => $item['EDE_SPECDES16'],
-                            'fabric_composition' => $item['EDE_SPECDES18'],
+                            'fabric_composition' => $item['ROYY_SPECEDES12'],
                             'child_size' => $item['EDE_SPECDES3']
 
 
@@ -144,7 +142,7 @@ function syncItemsPriorityVariationGant()
                         $variation_data = array(
                             'attributes' => $children['attributes'],
                             'sku' => $sku_children,
-                            //'regular_price' => !empty($children['regular_price']) ? ($children['regular_price']) : $parent[$sku_children]['regular_price'],
+                            'regular_price' => !empty($children['regular_price']) ? ($children['regular_price']) : $parent[$sku_children]['regular_price'],
                             'product_code' => $children['sku'],
                             'sale_price' => '',
                             'stock' => $children['stock'],
@@ -167,7 +165,9 @@ function syncItemsPriorityVariationGant()
                         update_field('sub_cat', $children['sub_cat'], $id);
                         update_field('fabric', $children['fabric'], $id);
                         update_field('fabric_desc', $children['fabric_desc'], $id);
+                        update_field('fabric_composition', $children['fabric_composition'], $id);
                         update_field('sleeve_type', $children['sleeve_type'], $id);
+                        update_field('sub_group_jersey', $children['sub_group_jersey'], $id);
                         update_field('made_in', $children['made_in'], $id);
 
                         $term = get_term_by('name', $attributes['size'], 'pa_size')->term_id;
@@ -180,15 +180,12 @@ function syncItemsPriorityVariationGant()
             }
         //}
         // add timestamp
-        WooAPI::instance()->updateOption('items_priority_variation_update', time());
+        //WooAPI::instance()->updateOption('items_priority_variation_update', time());
     } else {
-        WooAPI::instance()->sendEmailError(
-            WooAPI::instance()->option('email_error_sync_items_priority_variation'),
-            'Error Sync Items Priority Variation',
-            $response['body']
-        );
-        exit(json_encode(['status' => 0, 'msg' => 'Error Sync Items Priority Variation']));
+        $subj = 'check sync item';
+        wp_mail( 'elisheva.g@simplyct.co.il', $subj, implode(" ",$response) );
     }
+    
 }
 
 add_action('syncItemsPriorityVariationGant_cron_hook', 'syncItemsPriorityVariationGant');
