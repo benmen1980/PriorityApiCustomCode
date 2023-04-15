@@ -4,11 +4,10 @@ function simply_ItemsAtrrVariation_func($item)
 {
     $attributes['color'] = $item['SPEC14'];
     $attributes['size'] = $item['SPEC12'];
-    return $attributes;
+	$item['attributes']= $attributes;
+    return $item;
 }
-
 use PriorityWoocommerceAPI\WooAPI;
-
 add_filter('simply_modify_long_text', 'simply_modify_long_text_func');
 function simply_modify_long_text_func($data)
 {
@@ -24,7 +23,6 @@ function simply_modify_long_text_func($data)
     }
     return $data;
 }
-
 if(!function_exists('simply_set_ship_class')) {
     function simply_set_ship_class($product_id, $class_name)
     {
@@ -40,7 +38,46 @@ if(!function_exists('simply_set_ship_class')) {
         }
     }
 }
-
 add_action('simply_update_product_data',function($item){
     simply_set_ship_class($item['product_id'],$item['SPEC7']);
 });
+add_filter('simply_search_customer_in_priority','simply_search_customer_in_priority');
+function simply_search_customer_in_priority($data){
+	$order = $data['order'];
+	if(empty($order)){
+		$data['CUSTNAME'] = null;
+		return $data;
+	}
+	$user_id = $data['user_id'];
+	if($order){
+		$email =  $order->get_billing_email();
+		//$phone =  $order->get_billing_phone();
+	}
+	if($user_id) {
+		if ($user = get_userdata($user_id)) {
+			$meta = get_user_meta($user_id);
+			$email = $user->data->user_email;
+			//$phone = isset($meta['billing_phone']) ? $meta['billing_phone'][0] : '';
+		}
+	}
+
+	//check if customer already exist in priority
+	$data["select"] = 'EMAIL eq \'' . $email . '\'';
+	$url_addition = 'CUSTOMERS?$filter=EMAIL eq \''.$email.'\'';
+	$res =  WooAPI::instance()->makeRequest('GET', $url_addition, [], true);
+	if($res['code']==200){
+		$body =   json_decode($res['body']);
+		$value = $body->value[0];
+		$custname =$value->CUSTNAME;
+	}else{
+		$custname = null;
+	}
+	$data['CUSTNAME'] = $custname;
+	return $data;
+}
+add_filter('simply_request_data', 'simply_func');
+function simply_func($data)
+{
+		unset($data['CDES']);
+		return $data;
+}
