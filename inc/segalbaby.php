@@ -7,17 +7,26 @@ function simply_func($data){
     //var_dump($data);
     $id_order = $data["orderId"];
     $order = new \WC_Order($id_order);
-    $i = sizeof($data['ORDERITEMS_SUBFORM']);
+   //$i = sizeof($data['ORDERITEMS_SUBFORM']);
+
     foreach ($order->get_items() as $item) {
         $formatted_meta_data = $item->get_formatted_meta_data( '_', true );
+    // 		echo "<pre>";
+    // 		print_r($formatted_meta_data);
+    // 		echo "</pre>";
         if(!empty($formatted_meta_data)){
-            foreach($data['ORDERITEMS_SUBFORM'] as $item ){
+			$items= [];
+            foreach($data['ORDERITEMS_SUBFORM'] as  $item_id => $item ){
                 if($item['PERCENT'] < 0){
                     unset($item['PERCENT']);
                 }
-                $items[] = $item;
-                $data['ORDERITEMS_SUBFORM'] = $items;
+				 $items[] = $item;
             }
+			 //unset($data['ORDERITEMS_SUBFORM']);
+    		$data['ORDERITEMS_SUBFORM'] = $items;
+            // 			echo "<pre>";
+            // 				print_r($data['ORDERITEMS_SUBFORM']);
+            // 			echo "</pre>";
             foreach($formatted_meta_data as $formatted_data){
                 $data_details = explode(")", $formatted_data->value);
                 foreach($data_details as $data_item){
@@ -30,25 +39,27 @@ function simply_func($data){
                             $price = $product->get_price();
                         }
                         $qtty = intval(trim($data_item[1], ' x'));
-                        $data['ORDERITEMS_SUBFORM'][$i++] =[
+						 
+						 $data['ORDERITEMS_SUBFORM'][sizeof($data['ORDERITEMS_SUBFORM'])] = [
                             'PARTNAME' => $sku,
                             'TQUANT' => $qtty,
                             'VPRICE' => (float)$price,
                             'DUEDATE' => date('Y-m-d'),
                             
                         ];
+	
            
                     }
                     
                 } 
             }
+			
         }
     }
+	
 
-    $items = [];
-
+	$items = [];
     foreach ($data['ORDERITEMS_SUBFORM'] as $item) {
-
         $vatprice= $item['VATPRICE'];
 
         unset($item['VATPRICE']);
@@ -68,6 +79,9 @@ function simply_func($data){
     unset($data['ORDERITEMS_SUBFORM']);
 
     $data['ORDERITEMS_SUBFORM'] = $items;
+    // 	echo "<pre>";
+    // 	print_r($data['ORDERITEMS_SUBFORM']);
+    // 	echo "</pre>";
     return $data;
 
 }
