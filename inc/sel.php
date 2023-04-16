@@ -206,7 +206,7 @@ add_filter('simply_syncItemsPriority_item', 'simply_syncItemsPriority_item_func'
 function simply_syncItemsPriority_item_func($item)
 {
     global $wpdb;
-    $id = $item['id'];
+    $id = $item['product_id'] ?? $item['id'] ;
 
     if (!empty($item['SELK_MARKETINGDES'])) {
         $wpdb->query($wpdb->prepare("
@@ -221,11 +221,13 @@ function simply_syncItemsPriority_item_func($item)
     }
     $content = '';
     if (isset($item['SELK_WEBTEXT_SUBFORM'])) {
-        foreach ($item['SELK_WEBTEXT_SUBFORM'] as $text) {
+        /*foreach ($item['SELK_WEBTEXT_SUBFORM'] as $text) {
             $content .= '<br/>'.$text["TEXT"];
-        }
+        }*/
+	    $content = $item['SELK_WEBTEXT_SUBFORM']['TEXT'];
     }
     if (!empty($content)) {
+
         $wpdb->query($wpdb->prepare("
 							UPDATE $wpdb->posts
 							SET post_content = '%s'
@@ -235,15 +237,22 @@ function simply_syncItemsPriority_item_func($item)
             $id
         )
         );
+
+
+
+// update the post meta with the new description
+	  //  update_post_meta( $id, '_product_description', $content );
+
     }
     update_post_meta($id, 'product_barcode', $item['BARCODE']);
     update_post_meta($id, '_sku', $item['PARTNAME']);
 
     $content = '';
     if (isset($item['INTERNALDIALOGTEXT_SUBFORM'])) {
-        foreach ($item['INTERNALDIALOGTEXT_SUBFORM'] as $text) {
+       /* foreach ($item['INTERNALDIALOGTEXT_SUBFORM'] as $text) {
             $content .= $text["TEXT"];
-        }
+        }*/
+	    $content = $item['INTERNALDIALOGTEXT_SUBFORM']['TEXT'];
     }
     update_post_meta($id, 'product_technical_details', $content);
 
