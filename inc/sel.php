@@ -207,9 +207,9 @@ function simply_syncItemsPriority_item_func($item)
 {
     global $wpdb;
     $id = $item['product_id'] ?? $item['id'] ;
-
+/*
     if (!empty($item['SELK_MARKETINGDES'])) {
-        $wpdb->query($wpdb->prepare("
+       $res =  $wpdb->query($wpdb->prepare("
 							UPDATE $wpdb->posts
 							SET post_title = '%s'
 							WHERE ID = '%s'
@@ -219,15 +219,14 @@ function simply_syncItemsPriority_item_func($item)
         )
         );
     }
-	  if (isset($item['SELK_SHORTWEBTEXT_SUBFORM'])) {
-
-		  $new_excerpt = $item['SELK_SHORTWEBTEXT_SUBFORM']['TEXT'];
-		  $update_post = array(
-			  'ID'           => $id,
-			  'post_excerpt' => $new_excerpt,
-		  );
-		  wp_update_post( $update_post );
-	  }
+	*/
+	  $new_excerpt = $item['SELK_SHORTWEBTEXT_SUBFORM']['TEXT'];
+	  $update_post = array(
+		  'ID'           => $id,
+		  'post_excerpt' => $new_excerpt,
+		  'post_title'   => $item['SELK_MARKETINGDES']
+	  );
+	  wp_update_post( $update_post );
     $content = '';
     if (isset($item['SELK_WEBTEXT_SUBFORM'])) {
         /*foreach ($item['SELK_WEBTEXT_SUBFORM'] as $text) {
