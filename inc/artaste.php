@@ -53,11 +53,11 @@ function simply_search_customer_in_priority($data){
     $order = $data['order'];
     $user_id = $data['user_id'];
     if($order){
-        $email =  $order->get_billing_email();
+        $email =  strtolower($order->get_billing_email());
     }
     if($user_id) {
         if ($user = get_userdata($user_id)) {
-            $email = $user->data->user_email;
+            $email = strtolower($user->data->user_email);
         }
     }
     //check if customer already exist in priority
