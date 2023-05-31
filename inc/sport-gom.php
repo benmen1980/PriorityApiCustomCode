@@ -107,7 +107,7 @@ add_filter('simply_ItemsAtrrVariation', 'simply_ItemsAtrrVariation_func');
 function simply_ItemsAtrrVariation_func($item)
 {
 	$attributes['color'] = $item['SPEC2'];
-	$attributes['size'] = $item['SPEC3'];
+	$attributes['size'] = $item['SPEC1'];
 	$item['attributes'] = $attributes;
 	return $item;
 }

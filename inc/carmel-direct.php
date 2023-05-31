@@ -20,7 +20,11 @@ function simply_search_customer_in_priority($data){
             $phone = isset($meta['billing_phone']) ? $meta['billing_phone'][0] : '';
         }
     }
-    $tz = get_post_meta($order->get_id(), 'tz', true);
+	$tz = get_post_meta($order->get_id(), 'id_number', true);
+	if(empty($tz)){
+		$data['CUSTNAME'] = null;
+		return $data;
+	}
     //check if customer already exist in priority
     $data["select"] = 'VATNUM eq \'' . $tz . '\'';
     $url_addition = 'CUSTOMERS?$select=CUSTNAME&$filter=' . $data['select'] ;
