@@ -70,6 +70,11 @@ function simply_post_prospect_func($json)
     $json["NSFLAG"]="Y";
     return $json;
 }
+add_filter('simply_request_data','manipulate_order');
+function manipulate_order($data){
+	unset($data['CDES']);
+	return $data;
+}
 /*
  add_filter('simply_modify_customer_number', 'simply_modify_customer_number_func');
 function simply_modify_customer_number_func($cust_data)
