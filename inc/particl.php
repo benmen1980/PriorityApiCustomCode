@@ -116,9 +116,9 @@ function simplyct_sendEmail_func($send)
 }
 add_filter( 'woocommerce_order_data_store_cpt_get_orders_query', 'custom_order_query', 10, 3 );
 function custom_order_query($query, $query_vars,$context){
-	//delete_post_meta(2279,'priority_invoice_status');
-	//delete_post_meta(2278,'priority_invoice_status');
-	if ($context === 'specific_order_query') {
+	delete_post_meta(2279,'priority_invoice_status');
+	delete_post_meta(2278,'priority_invoice_status');
+	if ($query['context'] === 'specific_order_query') {
 		$query['meta_query'][] = array(
 			'relation' => 'AND',
 			array(
@@ -132,6 +132,7 @@ function custom_order_query($query, $query_vars,$context){
 		);
 		$statuses              = array( 'wc-processing', 'wc-completed' );
 		$query['post_status']  = $statuses;
+		$query['posts_per_page'] = -1;
 	}
 	return $query;
 }
