@@ -114,3 +114,66 @@ function simplyct_sendEmail_func($send)
     array_push($send, 'rachel@particleformen.com');
     return $send;
 }
+add_filter( 'woocommerce_order_data_store_cpt_get_orders_query', 'custom_order_query', 10, 3 );
+function custom_order_query($query, $query_vars,$context){
+	delete_post_meta(2279,'priority_invoice_status');
+	delete_post_meta(2278,'priority_invoice_status');
+	if ($context === 'specific_order_query') {
+		$query['meta_query'][] = array(
+			'relation' => 'AND',
+			array(
+				'key'     => 'warehouseid',
+				'compare' => 'EXISTS',
+			),
+			array(
+				'key'     => 'priority_invoice_status',
+				'compare' => 'NOT EXISTS',
+			)
+		);
+		$statuses              = array( 'wc-processing', 'wc-completed' );
+		$query['post_status']  = $statuses;
+	}
+	return $query;
+}
+// Create a custom action hook for cron
+function custom_sync_ainvoices() {
+	WooAPI::instance()->syncAinvoices();
+}
+add_action('particl_sync_invoices', 'custom_sync_ainvoices');
+// add the invoice and status to the orders grig even if not checked.
+add_filter('manage_edit-shop_order_columns',
+	function ($columns) {
+		// Set "Actions" column after the new colum
+		$action_column = $columns['order_actions']; // Set the title in a variable
+
+
+			// add the Priority invoice number
+			$columns['priority_invoice_number'] = '<span>' . __( 'Priority Invoice', 'p18w' ) . '</span>'; // title
+			$columns['priority_invoice_status'] = '<span>' . __( 'Priority Invoice Status', 'p18w' ) . '</span>'; // title
+
+return $columns;
+	},999);
+add_action('manage_shop_order_posts_custom_column',
+	function ($column, $post_id) {
+
+		// HERE get the data from your custom field (set the correct meta key below)
+
+
+			$invoice_number = get_post_meta($post_id, 'priority_invoice_number', true);
+			$invoice_status = get_post_meta($post_id, 'priority_invoice_status', true);
+			if (empty($invoice_status)) $invoice_status = '';
+			if (strlen($invoice_status) > 15) $invoice_status = '<div class="tooltip">Error<span class="tooltiptext">' . $invoice_status . '</span></div>';
+			if (empty($invoice_number)) $invoice_number = '';
+
+		switch ($column) {
+			// invoice
+			case 'priority_invoice_status' :
+				echo $invoice_status;
+				break;
+			case 'priority_invoice_number' :
+				echo '<span>' . $invoice_number . '</span>'; // display the data
+				break;
+
+		}
+	}, 999, 2);
+
