@@ -150,6 +150,7 @@ add_filter('manage_edit-shop_order_columns',
 			// add the Priority invoice number
 			$columns['priority_invoice_number'] = '<span>' . __( 'Priority Invoice', 'p18w' ) . '</span>'; // title
 			$columns['priority_invoice_status'] = '<span>' . __( 'Priority Invoice Status', 'p18w' ) . '</span>'; // title
+		$columns['warehouseid'] = '<span>' . __( 'Warehouse ID', 'p18w' ) . '</span>'; // title
 
 return $columns;
 	},999);
@@ -161,6 +162,7 @@ add_action('manage_shop_order_posts_custom_column',
 
 			$invoice_number = get_post_meta($post_id, 'priority_invoice_number', true);
 			$invoice_status = get_post_meta($post_id, 'priority_invoice_status', true);
+		    $warehouseid = get_post_meta($post_id, 'warehouseid', true);
 			if (empty($invoice_status)) $invoice_status = '';
 			if (strlen($invoice_status) > 15) $invoice_status = '<div class="tooltip">Error<span class="tooltiptext">' . $invoice_status . '</span></div>';
 			if (empty($invoice_number)) $invoice_number = '';
@@ -173,7 +175,9 @@ add_action('manage_shop_order_posts_custom_column',
 			case 'priority_invoice_number' :
 				echo '<span>' . $invoice_number . '</span>'; // display the data
 				break;
-
+			case 'warehouseid' :
+				echo '<span>' . $warehouseid . '</span>'; // display the data
+				break;
 		}
 	}, 999, 2);
 
