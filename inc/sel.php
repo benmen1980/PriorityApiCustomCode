@@ -20,7 +20,7 @@ function sync_product_attachemtns()
     $search_field_web = (!empty($config->search_field_web) ? $config->search_field_web : '_sku');
     ob_start();
     //$allowed_sufix = ['jpg', 'jpeg', 'png'];
-    $daysback = 15;
+    $daysback = 1;
     $stamp = mktime(0 - $daysback * 24, 0, 0);
     $bod = date(DATE_ATOM, $stamp);
     $search_field_select = $search_field == 'PARTNAME' ? $search_field : $search_field . ',PARTNAME';
@@ -61,7 +61,7 @@ function sync_product_attachemtns()
             $is_uri = strpos('1' . $file_path, 'http') ? false : true;
             if (!empty($file_path)) {
                 $file_ext = $attachment['SUFFIX'];
-                $images_url = 'https://' . WooAPI::instance()->option('url') . '/zoom/primail';
+                $images_url = 'https://' . WooAPI::instance()->option('url') . '/pri/primail';
                 $image_base_url = $config->image_base_url;
                 if (!empty($image_base_url)) {
                     $images_url = $image_base_url;
@@ -87,8 +87,8 @@ function sync_product_attachemtns()
                     $ar = explode(',', $file_path);
                     $image_data = $ar[0];
                     $file_type = explode(';', explode(':', $image_data)[1])[0];
-                    $extension = explode('/', $file_type)[1];
-                    $file_name = 'simplyCT/' . $sku . $attachment['EXTFILENAME'] . '.' . $extension;
+                    $extension = $attachment['SUFFIX'];
+                    $file_name = 'simplyCT/' . $sku .  '.' . $extension;
                     $id = $wpdb->get_var("SELECT post_id FROM $wpdb->postmeta WHERE meta_value like  '%$file_name' AND meta_key = '_wp_attached_file'");
                     if ($id) {
                         echo $attachment['EXTFILENAME'] . ' already exists in media, add to product... <br>';
@@ -97,12 +97,11 @@ function sync_product_attachemtns()
                         continue;
                     }
 
-                    echo 'File ' . $file_path . ' not exsits, downloading from ' . $images_url, '<br>';
-                    $file = WooAPI::instance()->save_uri_as_image($product_full_url, $attachment['EXTFILENAME']);
+                    $file = WooAPI::instance()->save_uri_as_image($product_full_url, $sku.rand(1,100000));
                     $attach_id = $file[0];
                     $file_name = $file[1];
                 }
-                $attach_id = download_attachment($sku . $attachment['EXTFILEDES'], $product_full_url);
+               // $attach_id = download_attachment($sku . $attachment['EXTFILEDES'], $product_full_url);
                 if ($attach_id == null) {
                     continue;
                 }
@@ -133,7 +132,7 @@ function sync_product_attachemtns_pdf()
     $search_field = (!empty($config->search_by) ? $config->search_by : 'PARTNAME');
     $search_field_web = (!empty($config->search_field_web) ? $config->search_field_web : '_sku');
     $search_field_select = $search_field == 'PARTNAME' ? $search_field : $search_field . ',PARTNAME';
-    $daysback = 15;
+    $daysback = 1;
     $stamp = mktime(0 - $daysback * 24, 0, 0);
     $bod = date(DATE_ATOM, $stamp);
     ob_start();
