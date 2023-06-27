@@ -33,6 +33,7 @@ function sync_product_attachemtns()
 		$response2 = WooAPI::instance()->makeRequest('GET',$url, [], WooAPI::instance()->option('log_attachments_priority', true));
 		$response_data2 = json_decode($response2['body_raw'], true);
 		foreach ($response_data2['value'] as  $item) {
+			usleep(10000);
 			$search_by_value = $item[$search_field];
 			$sku = $item[$search_field];
 			//$product_id = wc_get_product_id_by_sku($sku);
@@ -127,6 +128,8 @@ function sync_product_attachemtns_pdf()
     $response = WooAPI::instance()->makeRequest('GET', 'LOGPART?$filter=UDATE ge ' . urlencode($bod) . ' and EXTFILEFLAG eq \'Y\' &$select=' . $search_field_select . '&$expand=PARTEXTFILE_SUBFORM($select=EXTFILENAME;$filter=SUFFIX eq \'pdf\')');
     $response_data = json_decode($response['body_raw'], true);
     foreach ($response_data['value'] as $item) {
+	    // Sleep for 1 second to prevent timeout errors
+	    usleep(10000);
         $search_by_value = (string)$item[$search_field];
         $sku = (string)$item[$search_field];
         $args = array(
