@@ -237,11 +237,17 @@ function simply_func_syncItem_cron()
 
                 }
             }
+            // Get the current product type
+            $current_product_type = get_product_type($product_id);
+
+            // Save the current product type as a variable
+            $saved_product_type = $current_product_type; 
+
             // if product variation skip
             if ($product_id != 0)
             {
                 $item = apply_filters( 'simply_syncItemsPriority_item', $item );
-
+                
                 $pri_price = WooAPI::instance()->option('price_method') == true ? $item['VATPRICE'] : $item['BASEPLPRICE'];
 
                 $my_product = new \WC_Product( $product_id );
@@ -249,8 +255,28 @@ function simply_func_syncItem_cron()
                 $my_product->set_regular_price($pri_price);
 
                 $my_product->save();
+
+                $current_product_type1 = get_product_type($product_id);
+
+                $updated_product = new \WC_Product( $product_id );
+
+                // Check if the saved product is still a bundle type
+                if ($saved_product_type == "bundle") {
+
+                    $product_id = $updated_product->get_id();
+
+                    // Set the product type back to "bundle" and save again
+                    wp_set_object_terms($product_id, 'bundle', 'product_type');
+
+                    $product_terms = wp_get_object_terms($product_id, 'product_type');
+
+                }
+          
             }
+
         }
+
+
         // add timestamp
 
         WooAPI::instance()->updateOption('items_priority_update', time());
