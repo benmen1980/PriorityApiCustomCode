@@ -1,7 +1,7 @@
 <?php 
 use PriorityWoocommerceAPI\WooAPI;
 /**
- * sync items with variation from priority
+ * sync item with variation from priority
  */
 function syncItemsPriorityVariationGant()
 {
