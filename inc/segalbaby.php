@@ -321,7 +321,7 @@ function simply_func_syncInventory_cron()
 
 {
 
-    $response = WooAPI::instance()->makeRequest('GET', 'LOGPART?$select=PARTNAME,LAVI_TOTINVWEB&$filter=SHOWINWEB eq \'Y\'', [], WooAPI::instance()->option('log_inventory_priority', false));
+    $response = WooAPI::instance()->makeRequest('GET', 'LOGPART?$select=PARTNAME,LAVI_TOTINVWEB&$filter=SHOWINWEB eq \'Y\' and (PARTNAME eq \'100101\' OR PARTNAME eq \'308070\')', [], WooAPI::instance()->option('log_inventory_priority', false));
     // check response status        // check response status
     // check response status
 
@@ -375,13 +375,23 @@ function simply_func_syncInventory_cron()
                 if ($product->post_type == 'product') {
                     $product->set_manage_stock(true);
                 }
+                // if ($product->product_type == "bundle") {
+
+                //    // $product_id = $updated_product->get_id();
+
+                //     // Set the product type back to "bundle" and save again
+                //     wp_set_object_terms($product->id, 'bundle', 'product_type');
+
+                //     continue;
+
+                // }
                 $product->save();
             }
 
         }
         // add timestamp
 
-        WooAPI::instance()->updateOption('items_priority_update', time());
+    // WooAPI::instance()->updateOption('items_priority_update', time());
     } else {
 
         WooAPI::instance()->sendEmailError(
@@ -452,3 +462,4 @@ if (!wp_next_scheduled('check_order_not_sync_cron_hook')) {
 
 
 ?>
+
