@@ -181,6 +181,18 @@ class SyncItemCron extends \PriorityAPI\API {
         return static::$instance;
     }
 
+    public function __construct()
+    {
+
+        add_action( 'simply_cron_hook', array($this, 'simply_func_syncItem_cron'));
+
+        if ( ! wp_next_scheduled( 'simply_cron_hook' ) ) {
+
+            $res = wp_schedule_event( time(), 'one_hour', 'simply_cron_hook' );
+
+        }
+
+    }
 
     public function simply_func_syncItem_cron()
 
@@ -289,7 +301,6 @@ class SyncItemCron extends \PriorityAPI\API {
 
                     $my_product->save();
 
-
                     $updated_product = new \WC_Product( $product_id );
 
                     // Check if the saved product is still a bundle type
@@ -329,28 +340,20 @@ class SyncItemCron extends \PriorityAPI\API {
 
     }
 
-    public function __construct()
-    {
-
-        add_action( 'simply_cron_hook', array($this, 'simply_func_syncItem_cron'));
-
-        if ( ! wp_next_scheduled( 'simply_cron_hook' ) ) {
-
-            $res = wp_schedule_event( time(), 'one_hour', 'simply_cron_hook' );
-
-        }
-
-    }
-
 }
 $SyncItemCron = new SyncItemCron();
 
 
 
+
+//syncInventory
+
+// use WooCommercePriorityAPI\WooAPI;
 class SyncInventory extends \PriorityAPI\API {
 
     private static $instance; // api instance
     private $countries = []; // countries list
+
 
     public static function instance()
     {
@@ -373,13 +376,12 @@ class SyncInventory extends \PriorityAPI\API {
         }
 
     }
-
-    //syncInventory
+    
     public function simply_func_syncInventory_cron()
 
     {
 
-        $response = $this->makeRequest('GET', 'LOGPART?$select=PARTNAME,LAVI_TOTINVWEB&$filter=SHOWINWEB eq \'Y\' and (PARTNAME eq \'100101\' OR PARTNAME eq \'308070\') ', [], $this->option('log_inventory_priority', false));
+        $response = $this->makeRequest('GET', 'LOGPART?$select=PARTNAME,LAVI_TOTINVWEB&$filter=SHOWINWEB eq \'Y\'', [], $this->option('log_inventory_priority', false));
         // check response status       
 
         if ($response['status']) {
@@ -432,7 +434,7 @@ class SyncInventory extends \PriorityAPI\API {
                     if ($product->post_type == 'product') {
                         $product->set_manage_stock(true);
                     }
-
+   
                     $product->save();
                 }
 
