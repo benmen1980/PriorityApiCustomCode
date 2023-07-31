@@ -3,6 +3,10 @@ use PriorityWoocommerceAPI\WooAPI;
 add_filter('simply_request_data', 'simply_func');
 function simply_func($data)
 {
+    // First function logic
+    unset($data['CDES']);
+
+    // Second function logic
     if ($data['doctype'] === 'ORDERS') {
 
         if (isset($data['PAYMENTDEF_SUBFORM']['mult'])) {
@@ -16,6 +20,9 @@ function simply_func($data)
     print_r ($data);
     print_r ('<br/>');
     print_r ($data['PAYMENTDEF_SUBFORM']['PAYMENTCODE']['mult']);
+    
+    // Return the modified data
+    return $data;
 }
 // search CUSTNAME by email or phone, input is array user_id or  order object
 add_filter('simply_search_customer_in_priority','simply_search_customer_in_priority');
@@ -90,11 +97,11 @@ function simply_post_prospect_func($json)
 }
 
 
-add_filter('simply_request_data','manipulate_order');
-function manipulate_order($data){
-	unset($data['CDES']);
-	return $data;
-}
+// add_filter('simply_request_data','manipulate_order');
+// function manipulate_order($data){
+// 	unset($data['CDES']);
+// 	return $data;
+// }
 /*
  add_filter('simply_modify_customer_number', 'simply_modify_customer_number_func');
 function simply_modify_customer_number_func($cust_data)
