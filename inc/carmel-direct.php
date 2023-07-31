@@ -1,5 +1,19 @@
 <?php
 use PriorityWoocommerceAPI\WooAPI;
+add_filter('simply_request_data', 'simply_func');
+function simply_func($data)
+{
+    if ($data['doctype'] === 'ORDERS') {
+        if (isset($data['PAYMENTDEF_SUBFORM']['mult'])) {
+            switch ($data['PAYMENTDEF_SUBFORM']['PAYMENTCODE']) {
+                case '9':
+                    $data['PAYMENTDEF_SUBFORM']['mult']= '55';
+                    break; // Add a semicolon at the end of the break statement
+            }
+        }
+    }
+
+}
 // search CUSTNAME by email or phone, input is array user_id or  order object
 add_filter('simply_search_customer_in_priority','simply_search_customer_in_priority');
 function simply_search_customer_in_priority($data){
@@ -46,15 +60,16 @@ function simply_syncCustomer_func($json)
     $id = $json["id"];
     $tz = get_user_meta($id, 'tz', true);
     $json["VATNUM"] = $tz;
-    unset($json["CUSTNAME"]);
-    $json["CUSTNAMEPATNAME"] = 'CE';
+    if (!empty($json["CUSTNAME"])) {
+        $json["CUSTNAMEPATNAME"] = 'CE';
+    }
     $json["SPEC3"] = 'אתר כרמל';
     $json["SPEC11"] = 'כן';
     $json["CTYPECODE"] = "10";
     $json["NSFLAG"]="Y";
     return $json;
-
 }
+
 
 add_filter('simply_post_prospect', 'simply_post_prospect_func');
 function simply_post_prospect_func($json)
@@ -70,6 +85,8 @@ function simply_post_prospect_func($json)
     $json["NSFLAG"]="Y";
     return $json;
 }
+
+
 add_filter('simply_request_data','manipulate_order');
 function manipulate_order($data){
 	unset($data['CDES']);
