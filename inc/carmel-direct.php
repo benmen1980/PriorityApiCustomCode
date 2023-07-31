@@ -4,6 +4,7 @@ add_filter('simply_request_data', 'simply_func');
 function simply_func($data)
 {
     if ($data['doctype'] === 'ORDERS') {
+
         if (isset($data['PAYMENTDEF_SUBFORM']['mult'])) {
             switch ($data['PAYMENTDEF_SUBFORM']['PAYMENTCODE']) {
                 case '9':
@@ -12,7 +13,9 @@ function simply_func($data)
             }
         }
     }
-
+    print_r ($data);
+    print_r ('<br/>');
+    print_r ($data['PAYMENTDEF_SUBFORM']['PAYMENTCODE']['mult']);
 }
 // search CUSTNAME by email or phone, input is array user_id or  order object
 add_filter('simply_search_customer_in_priority','simply_search_customer_in_priority');
