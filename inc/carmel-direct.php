@@ -19,7 +19,7 @@ function simply_func($data)
     }
     print_r ($data);
     print_r ('<br/>');
-    print_r ($data['PAYMENTDEF_SUBFORM']['PAYMENTCODE']['mult']);
+    print_r ($data['PAYMENTDEF_SUBFORM']['PAYMENTCODE']);
     
     // Return the modified data
     return $data;
