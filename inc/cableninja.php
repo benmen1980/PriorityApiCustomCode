@@ -158,10 +158,10 @@ function CheckExistingProduct($product_sku, $item) {
 
     // Update ACF field Product attributes
     $product_attributes = array(
-        "0" => "12978",
-        "1" => "12974",
-        "2" => "12976",
-        "3" => "12977"
+        "0" => "12975",
+        "1" => "12977",
+        "2" => "12978",
+        "3" => "12979"
     );
     update_field('product_main_attributes', $product_attributes, $id);
 
