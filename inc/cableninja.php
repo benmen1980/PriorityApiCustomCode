@@ -542,16 +542,16 @@ function add_attache_priority_func($post_id) {
 
             //get the acf field 'link_array'
             $link = get_field('spec_link');
-            if( !empty($link) ) { 
+            /*if( !empty($link) ) { 
                 $link_url = $link['url'];
                 $link_title = $link['title'];
                 $link_target = $link['target'] ? $link['target'] : '_blank';
-            }
+            }*/
         }
     }
     
-    if( !empty($link_url) ) {
-        $attache = "<td style='white-space: normal!important;'><a href='".$link_url."' target='".$link_target."' >
+    if( !empty($link) ) {
+        $attache = "<td style='white-space: normal!important;'><a href='".$link."' target='".$link_target."' >
                             <img src='".get_stylesheet_directory_uri()."/assets/images/spec.svg' alt='Spec' style= 'width: 20px!important; max-width: 250%;'>
                             <span></span>
                     </a></td>";
