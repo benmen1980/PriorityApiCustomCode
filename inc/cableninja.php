@@ -50,11 +50,11 @@ function syncCPRofPriority() {
     }
 };
 
-add_action( 'sync_cprof', 'syncCPRofPriority');
+add_action('sync_cprof', 'syncCPRofPriority');
 
-if ( ! wp_next_scheduled( 'sync_cprof' ) ) {
+if (!wp_next_scheduled('sync_cprof')) {
 
-    $res = wp_schedule_event( time(), 'hearly', 'sync_cprof' );
+    $res = wp_schedule_event(time(), 'daily', 'sync_cprof');
 
 }
 
@@ -276,7 +276,6 @@ function CheckExistingProduct($product_sku, $item) {
                     }
                     if ($existing_term) {
                             wp_set_object_terms($product_id, $term_value, $attribute_name, true);
-                            $a = var_dump(wp_set_object_terms($product_id, $term_value, $attribute_name, true)) ;
                             $children_attributes[$attribute_name] = array(
                                 'name' => $attribute_name, // set attribute name
                                 'value' => $term_value, // set attribute value
@@ -306,15 +305,15 @@ function CheckExistingProduct($product_sku, $item) {
                 while ( $the_query->have_posts() ) {
                     $the_query->the_post();
 
-                    $product_url = get_permalink();
+                    // $product_url = get_permalink();
 
                     //get the acf field 'link_array'
                     $link = get_field('spec_link');
-                    if( !empty($link) ) { 
+                    /*if( !empty($link) ) { 
                         $link_url = $link['url'];
                         $link_title = $link['title'];
                         $link_target = $link['target'] ? $link['target'] : '_blank';
-                    }
+                    }*/
 
                    // Get the ID of the featured image
                     $image_id = get_post_thumbnail_id($post_id);
@@ -328,8 +327,8 @@ function CheckExistingProduct($product_sku, $item) {
             }
             
             $array_url = array(
-                'url' => $link_url,
-                'target' => "_blank",
+                'url' => $link,
+                'target' => $link_target,
             );
             update_field('spec_link', $array_url, $product_id);
 
@@ -391,12 +390,14 @@ function syncCPRofByNumber($sku) {
         if ($response_data['value'][0] > 0) {
             foreach ($response_data['value'] as $item) {
                 $response = CheckExistingProduct($item['CPROFNUM'],  $item);
+      
                 wp_send_json($response);
                 // if (CheckExistingProduct($item['CPROFNUM'],  $item)) {
                 //     continue; // Product already exists, skip to the next iteration
                 // }
 
             }
+
 
         } else {
             WooAPI::instance()->sendEmailError(
@@ -470,61 +471,60 @@ function add_button_shopping_cart_func($value) {
 // Hook into the filter used by the original plugin
 add_filter('add_button_shopping_cart', 'add_button_shopping_cart_func');
 
-function add_attache_priority_quote_func($values) {
-    $manufacturer_sku = $values['value1'];
-    $parent_id = $values['value2'];
+// function add_attache_priority_quote_func($values) {
+//     $manufacturer_sku = $values['value1'];
+//     $parent_id = $values['value2'];
     
-    $query_args = array(
-        'post_type' => array( 'product', 'product_variation' ),
-        'post_status' => 'publish',
-        'meta_query' => array(
-            '0' => array(
-                'key' => 'manufacturer_sku',
-                'value' => $manufacturer_sku,
-            ),
-            '1' => array(
-                'key' => 'parent_id',
-                'value' => $parent_id,
- 
-            ),
-            'relation' => 'AND',
-        ),
-    );
+//     $query_args = array(
+//         'post_type' => array( 'product', 'product_variation' ),
+//         'post_status' => 'publish',
+//         'meta_query' => array(
+//             '0' => array(
+//                 'key' => 'manufacturer_sku',
+//                 'value' =>  $manufacturer_sku,
+//                 'compare' => '=',
+//             ),
+//             '1' => array(
+//                 'key' => 'parent_id',
+//                 'value' => $parent_id,
+//                 'compare' => '=',
+//             ),
+//             'relation' => 'AND',
+//         ),
+//     );
     
-    // The Query
-    $the_query = new WP_Query( $query_args );
+//     // The Query
+//     $the_query = new WP_Query( $query_args );
     
-    // The Loop
-    if ( $the_query->have_posts() ) {
-        while ( $the_query->have_posts() ) {
-            $the_query->the_post();
+//     // The Loop
+//     if ( $the_query->have_posts() ) {
+//         while ( $the_query->have_posts() ) {
+//             $the_query->the_post();
 
-            $product_url = get_permalink();
+//             $product_url = get_permalink();
 
-            //get the acf field 'link_array'
-            $link = get_field('spec_link');
-            if( !empty($link) ) { 
-                $link_url = $link['url'];
-                $link_title = $link['title'];
-                $link_target = $link['target'] ? $link['target'] : '_blank';
-            }
-        }
-    }
+//             //get the acf field 'link_array'
+//             $link = get_field('spec_link');
+//             if( !empty($link) ) { 
+//                 $link_url = $link['url'];
+//                 $link_title = $link['title'];
+//                 $link_target = $link['target'] ? $link['target'] : '_blank';
+//             }
+//         }
+//     }
     
-    if( !empty($link_url) ) {
-        $attache = "<td style='white-space: normal!important;'><a href='".$link_url."' target='".$link_target."' >
-                            <img src='".get_stylesheet_directory_uri()."/assets/images/spec.svg' alt='Spec' style= 'width: 20px!important; max-width: 250%;'>
-                            <span></span>
-                    </a></td>";
-    } 
-    return $attache;
-}
+//     if( !empty($link_url) ) {
+//         $attache = "<td style='white-space: normal!important;'><a href='".$link_url."' target='".$link_target."' >
+//                             <img src='".get_stylesheet_directory_uri()."/assets/images/spec.svg' alt='Spec' style= 'width: 20px!important; max-width: 250%;'>
+//                             <span></span>
+//                     </a></td>";
+//     } 
+//     return $attache;
+// }
 
-add_filter('add_attache_priority_quote', 'add_attache_priority_quote_func');
+// add_filter('add_attache_priority_quote', 'add_attache_priority_quote_func');
 
 function add_attache_priority_func($post_id) {
-    $manufacturer_sku = $values['value1'];
-    $parent_id = $values['value2'];
     
     $query_args = array(
         'post_type' => array( 'product', 'product_variation' ),
