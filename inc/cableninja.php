@@ -328,7 +328,7 @@ function CheckExistingProduct($product_sku, $item) {
             
             $array_url = array(
                 'url' => $link,
-                'target' => $link_target,
+                'target' => "_blank",
             );
             update_field('spec_link', $array_url, $product_id);
 
@@ -357,6 +357,9 @@ function syncCPRofByNumber($sku) {
 
     if(!empty($_POST['CPROFNUM'])) {
         $sku = $_POST['CPROFNUM'];
+        $send_json = true;
+    } else {
+        $send_json = false;
     };
     
     $priority_version = (float)WooAPI::instance()->option('priority-version');
@@ -389,9 +392,8 @@ function syncCPRofByNumber($sku) {
         
         if ($response_data['value'][0] > 0) {
             foreach ($response_data['value'] as $item) {
-                $response = CheckExistingProduct($item['CPROFNUM'],  $item);
-      
-                wp_send_json($response);
+                $response = CheckExistingProduct($item['CPROFNUM'],  $item);    
+                
                 // if (CheckExistingProduct($item['CPROFNUM'],  $item)) {
                 //     continue; // Product already exists, skip to the next iteration
                 // }
@@ -410,7 +412,11 @@ function syncCPRofByNumber($sku) {
             wp_mail( 'margalit.t@simplyct.co.il', $subj, implode(" ",$response) );
         }
     }
-
+    if($send_json == 'true') {
+        wp_send_json($response);
+    };
+    
+    return $response;
 };
 
 function custom_add_endpoint($sku) {
@@ -425,11 +431,19 @@ function custom_process_product_endpoint() {
     if (isset( $_GET['q'] )) {
         $quote_param = $_GET['q'];               
         // Call the fixed function with the SKU parameter
-        syncCPRofByNumber($quote_param);
-        exit; // Make sure to exit after executing the code.       
+        $link_quote = syncCPRofByNumber($quote_param);
+        redirect($link_quote);
+        // exit; // Make sure to exit after executing the code.       
     }
+    return $link_p;
+
 }
 add_action( 'template_redirect', 'custom_process_product_endpoint', 1 );
+
+function redirect($url) {
+    header('Location: '.$url);
+    die();
+}
 
  // Define a custom function to modify the value of $begindate
  function report_priority_quote_sixmonth($begindate) {
@@ -453,7 +467,7 @@ function add_button_shopping_cart_func($value) {
 
     if ($data < $data2) {
         
-        $add_button = "<td><button data-num='".$value->CPROFNUM."' type='button' class='btn_quote'>לרכישה
+        $add_button = "<td><button style='font-size: 13px!important;' data-num='".$value->CPROFNUM."' type='button' class='btn_quote'>לרכישה
         <div class='loader_wrap'>
 			<div class='loader_spinner'>
 				
@@ -514,7 +528,7 @@ add_filter('add_button_shopping_cart', 'add_button_shopping_cart_func');
 //     }
     
 //     if( !empty($link_url) ) {
-//         $attache = "<td style='white-space: normal!important;'><a href='".$link_url."' target='".$link_target."' >
+//         $attache = "<td style='white-space: normal!important;'><a href='".$link_url."' target='_blank' >
 //                             <img src='".get_stylesheet_directory_uri()."/assets/images/spec.svg' alt='Spec' style= 'width: 20px!important; max-width: 250%;'>
 //                             <span></span>
 //                     </a></td>";
@@ -551,7 +565,7 @@ function add_attache_priority_func($post_id) {
     }
     
     if( !empty($link) ) {
-        $attache = "<td style='white-space: normal!important;'><a href='".$link."' target='".$link_target."' >
+        $attache = "<td style='white-space: normal!important;'><a href='".$link."' target='_blank' >
                             <img src='".get_stylesheet_directory_uri()."/assets/images/spec.svg' alt='Spec' style= 'width: 20px!important; max-width: 250%;'>
                             <span></span>
                     </a></td>";
