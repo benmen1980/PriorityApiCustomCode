@@ -15,6 +15,26 @@ function ajax_enqueue() {
 
 add_action( 'wp_enqueue_scripts', 'ajax_enqueue' );
 
+add_filter('cron_schedules', 'add_ten_minutes_interval');
+
+function add_ten_minutes_interval($schedules) {
+    $schedules['10_minutes'] = array(
+        'interval' => 600, // 10 minutes in seconds
+        'display' => __('כל 10 דקות')
+    );
+    return $schedules;
+}
+
+add_action('sync_cprof', 'syncCPRofPriority');
+
+// Clear any existing scheduled events for 'sync_cprof'
+wp_clear_scheduled_hook('sync_cprof');
+
+if (!wp_next_scheduled('sync_cprof')) {
+
+    $res = wp_schedule_event(time(), '10_minutes', 'sync_cprof');
+
+}
 
 /**
 * sync CPRof from priority to web
@@ -41,7 +61,7 @@ function syncCPRofPriority() {
 
         foreach ($response_data['value'] as $item) {
 
-            if (CheckExistingProduct($item['CPROFNUM'])) {
+            if (CheckExistingProduct($item['CPROFNUM'], $item)) {
                 continue; // Product already exists, skip to the next iteration
             }
               
@@ -49,14 +69,6 @@ function syncCPRofPriority() {
 
     }
 };
-
-add_action('sync_cprof', 'syncCPRofPriority');
-
-if (!wp_next_scheduled('sync_cprof')) {
-
-    $res = wp_schedule_event(time(), 'daily', 'sync_cprof');
-
-}
 
 function CheckExistingProduct($product_sku, $item) {
 
@@ -127,6 +139,10 @@ function CheckExistingProduct($product_sku, $item) {
     // Save the reformatted HTML
     $reformattedHtml = $dom->saveHTML();
 
+    //sync image
+    $image_quote = get_site_url().'/wp-content/uploads/2023/10/cable-ninja-logo.jpg';
+    $attach_id = attachment_url_to_postid($image_quote);
+    
     $parent = array(
         'author' => '', // optional
         'title' => 'הצעת מחיר: ' . $product_sku . ' ל: ' . $item['CDES'],
@@ -136,6 +152,8 @@ function CheckExistingProduct($product_sku, $item) {
         'sale_price' => '', // product sale price (optional)
         'stock' => 'Y', // Set a minimal stock quantity
         'sku' => $product_sku, // optional
+        'image_id' => (!empty($attach_id) && $attach_id != 0) ? $attach_id : '', // optional
+        'image_file' => (!empty($image_quote)) ? $image_quote : '', // optional
         // For NEW attributes/values use NAMES (not slugs)
         'attributes' => $attributes,
         'categories' => [
@@ -174,8 +192,8 @@ function CheckExistingProduct($product_sku, $item) {
     update_field('spec_link', $array_url, $id);
     
     // Add the category to the product
-    wp_set_object_terms($id, 'מבצעי ממוספרים ללקוחות', 'product_cat', true); 
-    
+    wp_set_object_terms($id, 'מבצעי ממוספרים ללקוחות', 'product_cat', true);
+        
     $quote_link = get_permalink($id);
           
     //create childrens products in site
@@ -309,11 +327,6 @@ function CheckExistingProduct($product_sku, $item) {
 
                     //get the acf field 'link_array'
                     $link = get_field('spec_link');
-                    /*if( !empty($link) ) { 
-                        $link_url = $link['url'];
-                        $link_title = $link['title'];
-                        $link_target = $link['target'] ? $link['target'] : '_blank';
-                    }*/
 
                    // Get the ID of the featured image
                     $image_id = get_post_thumbnail_id($post_id);
@@ -326,10 +339,22 @@ function CheckExistingProduct($product_sku, $item) {
                 wp_reset_postdata();
             }
             
-            $array_url = array(
-                'url' => $link,
-                'target' => "_blank",
-            );
+            if( is_array($link) ) { 
+                $link_url = $link['url'];
+                $link_title = $link['title'];
+                $link_target = $link['target'] ? $link['target'] : '_blank';
+
+                $array_url = array(
+                    'url' => $link_url,
+                    'target' => $link_target,
+                );
+            } else {
+                $array_url = array(
+                    'url' => $link,
+                    'target' => "_blank",
+                );
+            }
+          
             update_field('spec_link', $array_url, $product_id);
 
             if ($image_id) {
@@ -563,13 +588,22 @@ function add_attache_priority_func($post_id) {
             }*/
         }
     }
-    
-    if( !empty($link) ) {
-        $attache = "<td style='white-space: normal!important;'><a href='".$link."' target='_blank' >
-                            <img src='".get_stylesheet_directory_uri()."/assets/images/spec.svg' alt='Spec' style= 'width: 20px!important; max-width: 250%;'>
+
+    if( is_array($link) ) { 
+        $link_url = $link['url'];
+        $link_title = $link['title'];
+        $link_target = $link['target'] ? $link['target'] : '_blank';
+
+        $attache = "<td style='white-space: normal!important;'><a href='".$link_url."' target='".$link_target."' >
+                            <img src='".get_stylesheet_directory_uri()."/assets/images/spec.svg' alt='Spec' style= 'width: 20px!important; max-width: 500%;'>
                             <span></span>
                     </a></td>";
-    } 
+    } else {
+        $attache = "<td style='white-space: normal!important;'><a href='".$link."' target='_blank' >
+                            <img src='".get_stylesheet_directory_uri()."/assets/images/spec.svg' alt='Spec' style= 'width: 20px!important; max-width: 500%;'>
+                            <span></span>
+                    </a></td>";
+    }
     return $attache;
 }
 
