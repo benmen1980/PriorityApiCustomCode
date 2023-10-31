@@ -378,15 +378,19 @@ function CheckExistingProduct($product_sku, $item) {
 */
 add_action( 'wp_ajax_syncCPRofByNumber', 'syncCPRofByNumber' );
 add_action( 'wp_ajax_nopriv_syncCPRofByNumber', 'syncCPRofByNumber' );
-function syncCPRofByNumber($sku, $quote_token) {
+function syncCPRofByNumber($sku, $quote_token = null) {
 
-    if(!empty($_POST['CPROFNUM'])) {
-        $sku = $_POST['CPROFNUM'];
-        $send_json = true;
+    if ($quote_token !== null) {      
+        $quote_token = !empty($quote_token) ? ' and ROYY_RAND eq \'' . $quote_token . '\'' : null;
     } else {
-        $send_json = false;
+        if(!empty($_POST['CPROFNUM'])) {
+            $sku = $_POST['CPROFNUM'];
+            $send_json = true;
+        } else {
+            $send_json = false;
+        };
     };
-    
+   
     $priority_version = (float)WooAPI::instance()->option('priority-version');
     $is_categories = (!empty($config->categories) ? $config->categories : 'מבצעי ממוספרים ללקוחות');
     $res = WooAPI::instance()->option('sync_variations_priority_config');
@@ -406,7 +410,7 @@ function syncCPRofByNumber($sku, $quote_token) {
     $filter = urlencode($url_addition) . ' ' . $url_addition_config;
     // get all CPRof from priority
     $response = WooAPI::instance()->makeRequest('GET', 
-    'CPROF?$filter=CPROFNUM eq \'' . $sku . '\'' . ' and ROYY_RAND eq \'' . $quote_token . '\'' . '&' . $filter . $data['expand']. '', [],
+    'CPROF?$filter=CPROFNUM eq \'' . $sku . '\''  . $quote_token .  '&' . $filter . $data['expand']. '', [],
     WooAPI::instance()->option( 'log_items_priority', true ) );
 
 
@@ -439,9 +443,7 @@ function syncCPRofByNumber($sku, $quote_token) {
     return $response;
 };
 
-function custom_add_endpoint() {
-    $sku= 'PQ23007110';
-    $quote_token = 'null';
+function custom_add_endpoint($sku, $quote_token) {
     add_rewrite_endpoint( 'q', EP_ALL );
     // $endpoint_url = add_query_arg( 'q', $sku, home_url('/?') );
     $endpoint_url = add_query_arg(array('q' => $sku, 'r' => $quote_token), home_url('/'));
