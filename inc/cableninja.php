@@ -378,7 +378,7 @@ function CheckExistingProduct($product_sku, $item) {
 */
 add_action( 'wp_ajax_syncCPRofByNumber', 'syncCPRofByNumber' );
 add_action( 'wp_ajax_nopriv_syncCPRofByNumber', 'syncCPRofByNumber' );
-function syncCPRofByNumber($sku) {
+function syncCPRofByNumber($sku, $quote_token) {
 
     if(!empty($_POST['CPROFNUM'])) {
         $sku = $_POST['CPROFNUM'];
@@ -404,10 +404,9 @@ function syncCPRofByNumber($sku) {
 
     $url_addition_config = (!empty($config_v->additional_url) ? $config_v->additional_url : '');
     $filter = urlencode($url_addition) . ' ' . $url_addition_config;
-
     // get all CPRof from priority
     $response = WooAPI::instance()->makeRequest('GET', 
-    'CPROF?$filter=CPROFNUM eq \'' . $sku . '\'' . '&' . $filter . $data['expand']. '', [],
+    'CPROF?$filter=CPROFNUM eq \'' . $sku . '\'' . ' and ROYY_RAND eq \'' . $quote_token . '\'' . '&' . $filter . $data['expand']. '', [],
     WooAPI::instance()->option( 'log_items_priority', true ) );
 
 
@@ -427,14 +426,10 @@ function syncCPRofByNumber($sku) {
 
 
         } else {
-            WooAPI::instance()->sendEmailError(
-                WooAPI::instance()->option('email_error_sync_items_priority_variation'),
-                'Error Sync Items Priority Variation',
-                $response['body']
-            );
-            exit(json_encode(['status' => 0, 'msg' => 'Error Sync Items Priority Variation']));
-            $subj = 'check sync item';
-            wp_mail( 'margalit.t@simplyct.co.il', $subj, implode(" ",$response) );
+
+            exit(json_encode(['status' => 0, 'msg' => 'Error Sync quotes Priority ']));
+            $subj = 'check sync quote';
+            wp_mail( 'Yoav@arrowcables.com', $subj, implode(" ",$response) );
         }
     }
     if($send_json == 'true') {
@@ -444,23 +439,27 @@ function syncCPRofByNumber($sku) {
     return $response;
 };
 
-function custom_add_endpoint($sku) {
+function custom_add_endpoint() {
+    $sku= 'PQ23007110';
+    $quote_token = 'null';
     add_rewrite_endpoint( 'q', EP_ALL );
-    $endpoint_url = add_query_arg( 'q', $sku, home_url('/?') );
+    // $endpoint_url = add_query_arg( 'q', $sku, home_url('/?') );
+    $endpoint_url = add_query_arg(array('q' => $sku, 'r' => $quote_token), home_url('/'));
     wp_redirect($endpoint_url); // Redirect to the URL with the query variable set
     exit;
 }
 add_action( 'init', 'custom_add_endpoint', 10);
 
 function custom_process_product_endpoint() {
-    if (isset( $_GET['q'] )) {
-        $quote_param = $_GET['q'];               
+    if (isset( $_GET['q']) && isset($_GET['r'])) {
+        $quote_param = $_GET['q'];
+        $quote_token = $_GET['r'];               
         // Call the fixed function with the SKU parameter
-        $link_quote = syncCPRofByNumber($quote_param);
+        $link_quote = syncCPRofByNumber($quote_param , $quote_token);
         redirect($link_quote);
         // exit; // Make sure to exit after executing the code.       
     }
-    return $link_p;
+    // return $link_p;
 
 }
 add_action( 'template_redirect', 'custom_process_product_endpoint', 1 );
