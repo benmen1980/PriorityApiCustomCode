@@ -28,18 +28,18 @@
             $position = stripos($short_description, $searchText);
             if ($position !== false && !empty($short_description)) {
 
-                $text = substr_replace($short_description, '<p>' . $textToAdd . '</p>', $position);
+                $text = substr_replace($short_description, '<p>' . $textToAdd . '</p>', $position, 0);
                 $text .= $searchText;
             
                 // $text = $short_description . '<p>' . $textToAdd . '</p>';
+            } else if (!empty($short_description)){
+                $text = $short_description . '<p>' . $textToAdd . '</p>'; 
             } else {
                 $text = $textToAdd;
             }
-            $product->set_short_description($text);
-            $product->save();
-        }
+        $product->set_short_description($text);
+        $product->save();
+        } 
         return $product;
     });
-    
-
 ?>
