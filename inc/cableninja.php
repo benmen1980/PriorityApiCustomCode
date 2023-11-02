@@ -113,40 +113,16 @@ function CheckExistingProduct($product_sku, $item) {
     $attributes['יחידת מידה'] = ['יח\'', 'מטר'];
     $item['attributes'] = $attributes;
 
-    $content      = '';
-    if ( isset( $item['CPROFTEXT_SUBFORM'] ) ) {
-        foreach ( $item['CPROFTEXT_SUBFORM'] as $text ) {
-            $content .= ' ' . html_entity_decode( $text );
-        }
-    }
-
-    // Original HTML text
-    $html = $content;
-
-    // Create a DOMDocument
-    $dom = new DOMDocument();
-    $dom->loadHTML(mb_convert_encoding($html, 'HTML-ENTITIES', 'UTF-8'), LIBXML_HTML_NOIMPLIED | LIBXML_HTML_NODEFDTD);
-
-    // Remove invalid elements and attributes
-    $xpath = new DOMXPath($dom);
-
-    // Remove the invalid timestamp element
-    $timestampElements = $xpath->query('//timestamp:18787679:1');
-    foreach ($timestampElements as $timestampElement) {
-        $timestampElement->parentNode->removeChild($timestampElement);
-    }
-
-    // Save the reformatted HTML
-    $reformattedHtml = $dom->saveHTML();
+    $text = $item['CPROFTEXT_SUBFORM']['TEXT'];
 
     //sync image
-    $image_quote = get_site_url().'/wp-content/uploads/2023/10/cable-ninja-logo.jpg';
+    $image_quote = get_site_url().'/wp-content/uploads/2023/11/spechial-sale-logo.png';
     $attach_id = attachment_url_to_postid($image_quote);
     
     $parent = array(
         'author' => '', // optional
         'title' => 'הצעת מחיר: ' . $product_sku . ' ל: ' . $item['CDES'],
-        'content' => $reformattedHtml,
+        'content' => $text,
         'excerpt' => '',
         'regular_price' => '', // product regular price
         'sale_price' => '', // product sale price (optional)
@@ -378,10 +354,11 @@ function CheckExistingProduct($product_sku, $item) {
 */
 add_action( 'wp_ajax_syncCPRofByNumber', 'syncCPRofByNumber' );
 add_action( 'wp_ajax_nopriv_syncCPRofByNumber', 'syncCPRofByNumber' );
-function syncCPRofByNumber($sku, $quote_token = null) {
+function syncCPRofByNumber($sku, $quote_token = null ) {
+    //  $quote_token = null) {
 
     if ($quote_token !== null) {      
-        $quote_token = !empty($quote_token) ? ' and ROYY_RAND eq \'' . $quote_token . '\'' : null;
+        $quote_token = ' and ROYY_RAND eq \'' . $quote_token . '\'';
     } else {
         if(!empty($_POST['CPROFNUM'])) {
             $sku = $_POST['CPROFNUM'];
@@ -405,12 +382,13 @@ function syncCPRofByNumber($sku, $quote_token = null) {
     $url_addition = 'UDATE ge ' . $bod;
     $search_field = 'CPROFITEMS_SUBFORM($select=PARTNAME)'; //מקט של מוצר בן
     $data['expand'] = '&$expand=CPROFTEXT_SUBFORM,CPROFITEMS_SUBFORM($select=PARTNAME,TQUANT,PRICE,PDES, Y_17934_5_ESHB, BARCODE, SUPTIME, PERCENTPRICE, TUNITNAME, QPRICE, MPARTNAME,)';
-
+    // $quote_token = null;
+    // $quote_token =  ' and ROYY_RAND eq \'' . $quote_token . '\'';
     $url_addition_config = (!empty($config_v->additional_url) ? $config_v->additional_url : '');
     $filter = urlencode($url_addition) . ' ' . $url_addition_config;
     // get all CPRof from priority
     $response = WooAPI::instance()->makeRequest('GET', 
-    'CPROF?$filter=CPROFNUM eq \'' . $sku . '\''  . $quote_token .  '&' . $filter . $data['expand']. '', [],
+    'CPROF?$filter=CPROFNUM eq \'' . $sku . '\'' . $quote_token . '&' . $filter . $data['expand']. '', [],
     WooAPI::instance()->option( 'log_items_priority', true ) );
 
 
@@ -428,9 +406,7 @@ function syncCPRofByNumber($sku, $quote_token = null) {
 
             }
 
-
         } else {
-
             exit(json_encode(['status' => 0, 'msg' => 'Error Sync quotes Priority ']));
             $subj = 'check sync quote';
             wp_mail( 'Yoav@arrowcables.com', $subj, implode(" ",$response) );
@@ -493,7 +469,7 @@ function add_button_shopping_cart_func($value) {
 
     if ($data < $data2) {
         
-        $add_button = "<td><button style='font-size: 13px!important;' data-num='".$value->CPROFNUM."' type='button' class='btn_quote'>לרכישה
+        $add_button = "<td><button style='font-size: 13px!important;' data-num='".$value->CPROFNUM."' data-num='".$value->CPROFNUM."'type='button' class='btn_quote'>לרכישה
         <div class='loader_wrap'>
 			<div class='loader_spinner'>
 				
@@ -619,3 +595,21 @@ add_filter('add_attache_priority', 'add_attache_priority_func');
 add_action('add_message_front_priorityOrders', function(){?>
     <p><?php echo 'ברירת המחדל להצגה היא חצי שנה אחורה. ניתן לעדכן מתאריך ועד תאריך ועל ידי כך להביא הזמנות בטווח תאריכים שונה.'?></p>      
 <?php }); 
+
+
+// Get the product ID
+$product_id = get_the_ID();
+
+// Your text with HTML tags
+$text_with_html = '
+
+This is a sample text with HTML tags.
+
+';
+
+// Escape the HTML entities and save the text
+$escaped_text = wp_specialchars($text_with_html);
+
+// Save the escaped text as the short description
+update_post_meta($product_id, '_short_description', $escaped_text);
+
