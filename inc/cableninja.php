@@ -113,32 +113,6 @@ function CheckExistingProduct($product_sku, $item) {
     $attributes['יחידת מידה'] = ['יח\'', 'מטר'];
     $item['attributes'] = $attributes;
 
-    // $content      = '';
-    // if ( isset( $item['CPROFTEXT_SUBFORM'] ) ) {
-    //     foreach ( $item['CPROFTEXT_SUBFORM'] as $text ) {
-    //         $content .= ' ' . html_entity_decode( $text );
-    //     }
-    // }
-
-    // // Original HTML text
-    // $html = $content;
-
-    // // Create a DOMDocument
-    // $dom = new DOMDocument();
-    // $dom->loadHTML(mb_convert_encoding($html, 'HTML-ENTITIES', 'UTF-8'), LIBXML_HTML_NOIMPLIED | LIBXML_HTML_NODEFDTD);
-
-    // // Remove invalid elements and attributes
-    // $xpath = new DOMXPath($dom);
-
-    // // Remove the invalid timestamp element
-    // $timestampElements = $xpath->query('//timestamp:18787679:1');
-    // foreach ($timestampElements as $timestampElement) {
-    //     $timestampElement->parentNode->removeChild($timestampElement);
-    // }
-
-    // // Save the reformatted HTML
-    // $reformattedHtml = $dom->saveHTML();
-    // $text = $item['CPROFTEXT_SUBFORM']['TEXT'];
     //sync content
     $description = $item['CPROFTEXT_SUBFORM']['TEXT'];
    
@@ -206,35 +180,6 @@ function CheckExistingProduct($product_sku, $item) {
         
     $quote_link = get_permalink($id);
 
-    // $product = wc_get_product( $id );
-
-    // $aaa = $product->get_short_description();
-
-    // $description = $product->get_description();
-
-    
-    // $nnn = apply_filters( 'woocommerce_short_description', $product->get_description() );
-
-    // $a = 1;
-    // $www = apply_filters( 'woocommerce_short_description', $product->get_short_description() );
-
-    // $b =2;
-
-    // $text = $item['CPROFTEXT_SUBFORM']['TEXT'];
-
-
-    // $product = wc_get_product($id);
-
-
-
-    // $product->set_description($text);
-
-    // $product->save();
-
-    // $description = $product->get_description();
-
-    // $e = 2;
-          
     //create childrens products in site
     $childrens[$item[$product_sku]][$product_sku] = [
         'sku' => $product_sku,
