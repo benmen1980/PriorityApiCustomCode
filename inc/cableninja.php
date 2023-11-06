@@ -113,7 +113,37 @@ function CheckExistingProduct($product_sku, $item) {
     $attributes['יחידת מידה'] = ['יח\'', 'מטר'];
     $item['attributes'] = $attributes;
 
-    $text = $item['CPROFTEXT_SUBFORM']['TEXT'];
+    // $content      = '';
+    // if ( isset( $item['CPROFTEXT_SUBFORM'] ) ) {
+    //     foreach ( $item['CPROFTEXT_SUBFORM'] as $text ) {
+    //         $content .= ' ' . html_entity_decode( $text );
+    //     }
+    // }
+
+    // // Original HTML text
+    // $html = $content;
+
+    // // Create a DOMDocument
+    // $dom = new DOMDocument();
+    // $dom->loadHTML(mb_convert_encoding($html, 'HTML-ENTITIES', 'UTF-8'), LIBXML_HTML_NOIMPLIED | LIBXML_HTML_NODEFDTD);
+
+    // // Remove invalid elements and attributes
+    // $xpath = new DOMXPath($dom);
+
+    // // Remove the invalid timestamp element
+    // $timestampElements = $xpath->query('//timestamp:18787679:1');
+    // foreach ($timestampElements as $timestampElement) {
+    //     $timestampElement->parentNode->removeChild($timestampElement);
+    // }
+
+    // // Save the reformatted HTML
+    // $reformattedHtml = $dom->saveHTML();
+    // $text = $item['CPROFTEXT_SUBFORM']['TEXT'];
+    //sync content
+    $description = $item['CPROFTEXT_SUBFORM']['TEXT'];
+   
+    // Use a regular expression to remove content between <style> and </style>
+    $cleanedText = preg_replace('/<style>.*?<\/style>/s', '', $description);
 
     //sync image
     $image_quote = get_site_url().'/wp-content/uploads/2023/11/spechial-sale-logo.png';
@@ -122,7 +152,7 @@ function CheckExistingProduct($product_sku, $item) {
     $parent = array(
         'author' => '', // optional
         'title' => 'הצעת מחיר: ' . $product_sku . ' ל: ' . $item['CDES'],
-        'content' => $text,
+        'content' => $cleanedText,
         'excerpt' => '',
         'regular_price' => '', // product regular price
         'sale_price' => '', // product sale price (optional)
@@ -169,8 +199,41 @@ function CheckExistingProduct($product_sku, $item) {
     
     // Add the category to the product
     wp_set_object_terms($id, 'מבצעי ממוספרים ללקוחות', 'product_cat', true);
+
+    $_quote = new \WC_Product($id);
+    $_quote->set_catalog_visibility('hidden');
+    $_quote->save();
         
     $quote_link = get_permalink($id);
+
+    // $product = wc_get_product( $id );
+
+    // $aaa = $product->get_short_description();
+
+    // $description = $product->get_description();
+
+    
+    // $nnn = apply_filters( 'woocommerce_short_description', $product->get_description() );
+
+    // $a = 1;
+    // $www = apply_filters( 'woocommerce_short_description', $product->get_short_description() );
+
+    // $b =2;
+
+    // $text = $item['CPROFTEXT_SUBFORM']['TEXT'];
+
+
+    // $product = wc_get_product($id);
+
+
+
+    // $product->set_description($text);
+
+    // $product->save();
+
+    // $description = $product->get_description();
+
+    // $e = 2;
           
     //create childrens products in site
     $childrens[$item[$product_sku]][$product_sku] = [
@@ -206,7 +269,7 @@ function CheckExistingProduct($product_sku, $item) {
         $product_id = wp_insert_post( $data );
 
         if ( $product_id ) {
-            
+
             update_post_meta( $product_id, '_price', $product['QPRICE'] );
             update_post_meta( $product_id, '_regular_price', $product['QPRICE'] );
             // update_post_meta( $post_id, '_sale_price', "1" );
@@ -221,8 +284,6 @@ function CheckExistingProduct($product_sku, $item) {
                 update_post_meta($product_id, '_stock_status', 'onbackorder');
             }
             update_post_meta($product_id, '_stock', $in_stock);
-
-            
 
             // Update the product's "manage stock" option
             update_post_meta($product_id, '_manage_stock', 'yes');
@@ -339,6 +400,9 @@ function CheckExistingProduct($product_sku, $item) {
             }
             
         }
+        $_product = new \WC_Product($product_id);
+        $_product->set_catalog_visibility('hidden');
+        $_product->save();
             
         // And finally (optionally if needed)
         wc_delete_product_transients( $product_id ); // Clear refresh the variation cache
