@@ -174,12 +174,12 @@ function CheckExistingProduct($product_sku, $item) {
     // Add the category to the product
     wp_set_object_terms($id, 'מבצעי ממוספרים ללקוחות', 'product_cat', true);
 
-    $_quote = new \WC_Product($id);
+    $_quote = wc_get_product($id);
     $_quote->set_catalog_visibility('hidden');
     $_quote->save();
         
     $quote_link = get_permalink($id);
-
+          
     //create childrens products in site
     $childrens[$item[$product_sku]][$product_sku] = [
         'sku' => $product_sku,
@@ -464,7 +464,7 @@ function redirect($url) {
 };
 
 // Hook into the filter used by the original plugin
-add_filter('simply_request_data', 'report_priority_quote_sixmonth');
+add_filter('simply_excel_reports', 'report_priority_quote_sixmonth');
 
 // Define a custom function to modify the value of $begindate
 function add_button_shopping_cart_func($value) {
@@ -606,19 +606,13 @@ add_action('add_message_front_priorityOrders', function(){?>
 <?php }); 
 
 
-// Get the product ID
-$product_id = get_the_ID();
-
-// Your text with HTML tags
-$text_with_html = '
-
-This is a sample text with HTML tags.
-
-';
-
-// Escape the HTML entities and save the text
-$escaped_text = wp_specialchars($text_with_html);
-
-// Save the escaped text as the short description
-update_post_meta($product_id, '_short_description', $escaped_text);
-
+add_filter('simply_request_data', 'simply_func');
+function simply_func($data)
+{
+    if (empty($data['CUSTNAME'])) {
+        $cust_name = $this->option('walkin_number');
+        $data['CUSTNAME'] =$cust_name;
+    }
+    return $data;
+    
+}
