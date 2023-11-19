@@ -15,16 +15,6 @@ function ajax_enqueue() {
 
 add_action( 'wp_enqueue_scripts', 'ajax_enqueue' );
 
-add_filter('cron_schedules', 'add_ten_minutes_interval');
-
-function add_ten_minutes_interval($schedules) {
-    $schedules['10_minutes'] = array(
-        'interval' => 600, // 10 minutes in seconds
-        'display' => __('כל 10 דקות')
-    );
-    return $schedules;
-}
-
 add_action('sync_cprof', 'syncCPRofPriority');
 
 // Clear any existing scheduled events for 'sync_cprof'
@@ -32,10 +22,9 @@ wp_clear_scheduled_hook('sync_cprof');
 
 if (!wp_next_scheduled('sync_cprof')) {
 
-    $res = wp_schedule_event(time(), '10_minutes', 'sync_cprof');
+    $res = wp_schedule_event(time(), 'hourly', 'sync_cprof');
 
 }
-
 /**
 * sync CPRof from priority to web
 *
@@ -50,7 +39,7 @@ function syncCPRofPriority() {
 
     $date_filter    = 'PDATE ge ' . urlencode($sixMonthsAgo) . ' and PDATE le ' . urlencode($bod);
 
-    $data['expand'] = '$expand=CPROFTEXT_SUBFORM,CPROFITEMS_SUBFORM($select=PARTNAME,TQUANT,PRICE,PDES, Y_17934_5_ESHB, BARCODE, SUPTIME, PERCENTPRICE, TUNITNAME, QPRICE, MPARTNAME,)';
+    $data['expand'] = '$expand=CPROFTEXT_SUBFORM,CPROFITEMS_SUBFORM($expand=CPROFITEMSTEXT_SUBFORM)';
 
     $response = WooAPI::instance()->makeRequest('GET',
         'CPROF?$filter=' . $date_filter . '&' . $data['expand']. '', [],
@@ -163,6 +152,11 @@ function CheckExistingProduct($product_sku, $item) {
     );
     update_field('product_main_attributes', $product_attributes, $id);
 
+    $product_attributes_dropdown = array(
+        "0" => "12980"
+    );
+    update_field('product_attributes_dropdown', $product_attributes_dropdown, $id);
+
     update_field('manufacturer_sku', $item['CUSTNAME'], $id);
 
     $array_url = array(
@@ -179,7 +173,7 @@ function CheckExistingProduct($product_sku, $item) {
     $_quote->save();
         
     $quote_link = get_permalink($id);
-          
+         
     //create childrens products in site
     $childrens[$item[$product_sku]][$product_sku] = [
         'sku' => $product_sku,
@@ -254,6 +248,9 @@ function CheckExistingProduct($product_sku, $item) {
             // Set the attribute name and term value
             $_attributes = array();
 
+            $comment_text = $product['CPROFITEMSTEXT_SUBFORM']['TEXT'];
+            $comment  = ' ' . html_entity_decode( $comment_text );
+
             $_attributes['pa_סידרה'] = 'standart';
             $_attributes['pa_coil'] = 'PQ';
             $_attributes['pa_יחידת-מידה'] = $product['TUNITNAME'];
@@ -261,6 +258,7 @@ function CheckExistingProduct($product_sku, $item) {
             $_attributes['pa_כמות'] = $quant;
             $_attributes['pa_מחיר-ליחידה'] = $product['PRICE'];
             $_attributes['pa_זמן-אספקה'] = $back_order;
+            $_attributes['pa_הערה'] = $comment;
 
             // Check if the attribute exists
             foreach ($_attributes as $attribute_name => $term_value){
@@ -378,7 +376,7 @@ function syncCPRofByNumber($sku, $quote_token = null ) {
     };
    
     $priority_version = (float)WooAPI::instance()->option('priority-version');
-    $is_categories = (!empty($config->categories) ? $config->categories : 'מבצעי ממוספרים ללקוחות');
+    
     $res = WooAPI::instance()->option('sync_variations_priority_config');
     $res = str_replace(array('.', "\n", "\t", "\r"), '', $res);
     $config_v = json_decode(stripslashes($res));
@@ -386,11 +384,12 @@ function syncCPRofByNumber($sku, $quote_token = null ) {
     $show_front = !empty($config_v->show_front) ? $config_v->show_front : null;
     $config = json_decode(stripslashes(WooAPI::instance()->option('setting-config')));
     $chetzdaysback = $config->chetz_days_back;
+    $is_categories = (!empty($config->categories) ? $config->categories : 'מבצעי ממוספרים ללקוחות');
     $stamp = mktime(0 - $chetzdaysback * 24, 0, 0);
     $bod = date(DATE_ATOM, $stamp);
     $url_addition = 'UDATE ge ' . $bod;
     $search_field = 'CPROFITEMS_SUBFORM($select=PARTNAME)'; //מקט של מוצר בן
-    $data['expand'] = '&$expand=CPROFTEXT_SUBFORM,CPROFITEMS_SUBFORM($select=PARTNAME,TQUANT,PRICE,PDES, Y_17934_5_ESHB, BARCODE, SUPTIME, PERCENTPRICE, TUNITNAME, QPRICE, MPARTNAME,)';
+    $data['expand'] = '&$expand=CPROFTEXT_SUBFORM,CPROFITEMS_SUBFORM($expand=CPROFITEMSTEXT_SUBFORM)';
     // $quote_token = null;
     // $quote_token =  ' and ROYY_RAND eq \'' . $quote_token . '\'';
     $url_addition_config = (!empty($config_v->additional_url) ? $config_v->additional_url : '');
@@ -610,9 +609,48 @@ add_filter('simply_request_data', 'simply_func');
 function simply_func($data)
 {
     if (empty($data['CUSTNAME'])) {
-        $cust_name = $this->option('walkin_number');
+        $cust_name = WooAPI::instance()->option('walkin_number');
         $data['CUSTNAME'] =$cust_name;
     }
-    return $data;
-    
+
+    if (isset($data['CDES'])){
+        unset($data['CDES']);
+    };
+    return $data;   
+}
+
+add_filter('simply_modify_orderitem', 'my_custom_orderitem_modifier');
+
+function my_custom_orderitem_modifier($args) {
+    // Access the data and item from the filter
+    $data = $args['data'];
+    $item = $args['item'];
+
+    // unset($data['ORDERITEMS_SUBFORM']['PARTNAME']);
+    $product = $item->get_product();
+    if ($product) {
+        $product_id = $product->get_id();
+        $barcode = get_field('manufacturer_sku', $product_id);
+        $data['ORDERITEMS_SUBFORM'][sizeof($data['ORDERITEMS_SUBFORM']) - 1]['BARCODE'] = $barcode;
+    }
+
+    // Return the modified data
+    return ['data' => $data, 'item' => $item];
+}
+
+
+
+add_filter('simply_syncCustomer', 'simply_syncCustomer_func');
+function simply_syncCustomer_func($request)
+{
+    unset($request['EDOCUMENTS']);
+    return $request; 
+}
+
+
+add_filter('simplyct_sendEmail', 'simplyct_sendEmail_func');
+function simplyct_sendEmail_func($emails)
+{
+    array_push($emails, 'Yoav@arrowcables.com');
+    return $emails;
 }
