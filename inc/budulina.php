@@ -1,4 +1,5 @@
 <?php 
+use PriorityWoocommerceAPI\WooAPI;
 
 function simply_code_after_sync_inventory($product_id,$item){
 
@@ -18,7 +19,13 @@ add_filter('simply_syncInventoryPriority_filter_addition', 'simply_syncInventory
 function simply_syncInventoryPriority_filter_addition_func($url_addition)
 
 {
-    $url_addition.= ' and SPEC20 eq \'Y\'';
+    $daysback_options = explode(',', WooAPI::instance()->option('sync_inventory_warhsname'))[3];
+    $daysback = intval(!empty($daysback_options) ? $daysback_options : 1); // change days back to get inventory of prev days
+    $stamp = mktime(1 - ($daysback * 24), 0, 0);
+    $bod = date(DATE_ATOM, $stamp);
+
+    //$url_addition.= ' and SPEC20 eq \'Y\'';
+    $url_addition.= rawurlencode(' or UDATE ge ' . $bod) . ' and SPEC20 eq \'Y\'';
     
     return $url_addition;
 }
