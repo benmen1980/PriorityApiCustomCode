@@ -19,7 +19,7 @@ function simply_func($data)
         }
 
         unset($data['CURDATE']);
-        unset($data['CDES']);
+        //unset($data['CDES']);
         // ORDERSTEXT_SUBFORM replace with CPROFTEXT
         $data = WooAPI::instance()->change_key($data, 'ORDERSTEXT_SUBFORM', 'CPROFTEXT_SUBFORM');
         // CPROFCONT
@@ -73,3 +73,24 @@ function simply_search_customer_in_priority($data){
     $data['CUSTNAME'] = $custname;
     return $data;
 }
+
+add_filter('check_order_is_payment', 'check_order_payment_method', 2);
+function check_order_payment_method($order)
+{
+// [$order, $is_continue] = func_get_args();
+    
+    //$order = $order;
+    $payment_method = $order->get_payment_method();
+
+    $i = $payment_method;
+    
+    //$payment_method = $order->get_payment_method_title();
+    if($payment_method != 'gobitpaymentgateway'){
+        return 'false';
+    }
+    else {
+        return 'true';     
+    }
+    
+}
+   return $data;

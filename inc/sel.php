@@ -82,7 +82,7 @@ function sync_product_attachemtns()
 					$file_type = explode(';', explode(':', $image_data)[1])[0];
 					$extension = $attachment['SUFFIX'];
 					$file_name =  $sku . ($index+1);
-					$id = $wpdb->get_var("SELECT post_id FROM $wpdb->postmeta WHERE meta_value like  '%$file_name' AND meta_key = '_wp_attached_file'");
+					$id = $wpdb->get_var("SELECT post_id FROM $wpdb->postmeta WHERE meta_value like  '%$file_name%' AND meta_key = '_wp_attached_file'");
 					if ($id) {
 						$is_existing_file = true;
 						array_push($attachments, (int)$id);

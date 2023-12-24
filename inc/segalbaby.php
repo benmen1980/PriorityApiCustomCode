@@ -150,126 +150,7 @@ function simply_data($data)
     return $data;
 
 }
-use PriorityWoocommerceAPI\WooAPI;
 
-function simply_func_syncItem_cron()
-
-{
-
-    $priority_version = WooAPI::instance()->option('priority-version');
-
-    $daysback = 1;
-
-    $url_addition_config = '';
-
-    $search_field = 'PARTNAME';
-
-    $is_update_products = (bool)true;
-
-    // config
-
-    $raw_option = WooAPI::instance()->option('sync_items_priority_config');
-
-    $raw_option = str_replace(array( "\n", "\t", "\r"), '', $raw_option);
-
-    $config = json_decode(stripslashes($raw_option));
-
-    $daysback = (int)$config->days_back;
-
-    $synclongtext = $config->synclongtext;
-
-    $url_addition_config = $config->additional_url;
-
-    $search_field = (!empty($config->search_by) ? $config->search_by : 'PARTNAME');
-
-    // get the items simply by time stamp of today
-
-    $stamp = mktime(0 - $daysback*24, 0, 0);
-
-    $bod = date(DATE_ATOM,$stamp);
-
-    $date_filter = 'UDATE ge '.urlencode($bod);
-
-    $data['select'] = 'PARTNAME,BASEPLPRICE,VATPRICE';
-
-    $data = apply_filters( 'simply_syncItemsPriority_data', $data );
-
-    $response = WooAPI::instance()->makeRequest('GET', 'LOGPART?$select='.$data['select'].'&$filter='.$date_filter.' '.$url_addition_config.'&$expand=PARTUNSPECS_SUBFORM,PARTTEXT_SUBFORM',[], WooAPI::instance()->option('log_items_priority', true));
-
-    // check response status
-
-    if ($response['status']) {
-
-        $response_data = json_decode($response['body_raw'], true);
-         foreach($response_data['value'] as $item)
-        {
-            // if product exsits, update price
-            $search_by_value = $item[$search_field];
-            $args = array(
-
-                'post_type'		=>	array('product', 'product_variation'),
-
-                'post_status' => array('publish',  'draft'),
-
-                'meta_query'	=>	array(
-
-                    array(
-
-                        'key'       => '_sku',
-
-                        'value'	=>	$search_by_value
-
-                    )
-
-                )
-
-            );
-
-            $product_id = 0;
-            $my_query = new \WP_Query( $args );
-            if ( $my_query->have_posts() ) {
-
-                while ( $my_query->have_posts() ) {
-
-                    $my_query->the_post();
-
-                    $product_id = get_the_ID();
-
-                }
-            }
-            // if product variation skip
-            if ($product_id != 0)
-            {
-                $item = apply_filters( 'simply_syncItemsPriority_item', $item );
-
-                $pri_price = WooAPI::instance()->option('price_method') == true ? $item['VATPRICE'] : $item['BASEPLPRICE'];
-
-                $my_product = new \WC_Product( $product_id );
-
-                $my_product->set_regular_price($pri_price);
-
-                $my_product->save();
-            }
-        }
-        // add timestamp
-
-        WooAPI::instance()->updateOption('items_priority_update', time());
-    }
-    else {
-
-        WooAPI::instance()->sendEmailError(
-
-            WooAPI::instance()->option('email_error_sync_items_priority'),
-
-            'Error Sync Items Priority',
-
-            $response['body']
-
-        );
-    }
-    return $response;
-
-}
 add_filter( 'cron_schedules', 'example_add_cron_interval' );
 function example_add_cron_interval( $schedules ) {
 
@@ -282,103 +163,304 @@ function example_add_cron_interval( $schedules ) {
     return $schedules;
 
 }
-add_action( 'simply_cron_hook', 'simply_func_syncItem_cron' );
 
-if ( ! wp_next_scheduled( 'simply_cron_hook' ) ) {
+//use PriorityWoocommerceAPI\WooAPI;
 
-    $res = wp_schedule_event( time(), 'one_hour', 'simply_cron_hook' );
+class SyncItemCron extends \PriorityAPI\API {
 
-}
+    private static $instance; // api instance
+    private $countries = []; // countries list
 
-//syncInventory
-function simply_func_syncInventory_cron()
 
-{
+    public static function instance()
+    {
+        if (is_null(static::$instance)) {
+            static::$instance = new static();
+        }
 
-    $response = WooAPI::instance()->makeRequest('GET', 'LOGPART?$select=PARTNAME,LAVI_TOTINVWEB&$filter=SHOWINWEB eq \'Y\'', [], WooAPI::instance()->option('log_inventory_priority', false));
-    // check response status        // check response status
-    // check response status
+        return static::$instance;
+    }
 
-    if ($response['status']) {
+    public function __construct()
+    {
 
-        $response_data = json_decode($response['body_raw'], true);
-        foreach ($response_data['value'] as $item) {
-            // if product exsits, update price
-            $search_by_value = $item['PARTNAME'];
-            $args = array(
+        add_action( 'simply_cron_hook', array($this, 'simply_func_syncItem_cron'));
 
-                'post_type' => array('product', 'product_variation'),
+        if ( ! wp_next_scheduled( 'simply_cron_hook' ) ) {
 
-                'post_status' => array('publish', 'draft'),
+            $res = wp_schedule_event( time(), 'one_hour', 'simply_cron_hook' );
 
-                'meta_query' => array(
+        }
 
-                    array(
+    }
 
-                        'key' => '_sku',
+    public function simply_func_syncItem_cron()
 
-                        'value' => $search_by_value
+    {
+
+        $priority_version =  $this->option('priority-version');
+
+        $daysback = 1;
+
+        $url_addition_config = '';
+
+        $search_field = 'PARTNAME';
+
+        $is_update_products = (bool)true;
+
+        // config
+
+        $raw_option =  $this->option('sync_items_priority_config');
+
+        $raw_option = str_replace(array( "\n", "\t", "\r"), '', $raw_option);
+
+        $config = json_decode(stripslashes($raw_option));
+
+        $daysback = (int)$config->days_back;
+
+        $synclongtext = $config->synclongtext;
+
+        $url_addition_config = $config->additional_url;
+
+        $search_field = (!empty($config->search_by) ? $config->search_by : 'PARTNAME');
+
+        // get the items simply by time stamp of today
+
+        $stamp = mktime(0 - $daysback*24, 0, 0);
+
+        $bod = date(DATE_ATOM,$stamp);
+
+        $date_filter = 'UDATE ge '.urlencode($bod);
+
+        $data['select'] = 'PARTNAME,BASEPLPRICE,VATPRICE';
+
+        $data = apply_filters( 'simply_syncItemsPriority_data', $data );
+
+        $response =  $this->makeRequest('GET', 'LOGPART?$select='.$data['select'].'&$filter='.$date_filter.' '.$url_addition_config.'&$expand=PARTUNSPECS_SUBFORM,PARTTEXT_SUBFORM',[], $this->option('log_items_priority', true));
+
+        // check response status
+
+        if ($response['status']) {
+
+            $response_data = json_decode($response['body_raw'], true);
+            foreach($response_data['value'] as $item)
+            {
+                // if product exsits, update price
+                $search_by_value = $item[$search_field];
+                $args = array(
+
+                    'post_type'		=>	array('product', 'product_variation'),
+
+                    'post_status' => array('publish',  'draft'),
+
+                    'meta_query'	=>	array(
+
+                        array(
+
+                            'key'       => '_sku',
+
+                            'value'	=>	$search_by_value
+
+                        )
 
                     )
 
-                )
+                );
+
+                $product_id = 0;
+                $my_query = new \WP_Query( $args );
+                if ( $my_query->have_posts() ) {
+
+                    while ( $my_query->have_posts() ) {
+
+                        $my_query->the_post();
+
+                        $product_id = get_the_ID();
+
+                    }
+                }
+
+                // if product variation skip
+                if ($product_id != 0)
+                {
+                    $item = apply_filters( 'simply_syncItemsPriority_item', $item );
+                    
+                    $pri_price = $this->option('price_method') == true ? $item['VATPRICE'] : $item['BASEPLPRICE'];
+
+                    $my_product = new \WC_Product( $product_id );
+
+                    $my_product->set_regular_price($pri_price);
+
+                    // Get the current product type
+                    $current_product_type = wc_get_product( $product_id );
+
+                    if ( $current_product_type) {
+                        $saved_product_type = $current_product_type->get_type(); 
+
+                    }
+
+                    $my_product->save();
+
+                    $updated_product = new \WC_Product( $product_id );
+
+                    // Check if the saved product is still a bundle type
+                    if ($saved_product_type == "bundle") {
+
+                        $product_id = $updated_product->get_id();
+
+                        // Set the product type back to "bundle" and save again
+                        wp_set_object_terms($product_id, 'bundle', 'product_type');
+
+                        $product_terms = wp_get_object_terms($product_id, 'product_type');
+
+                    }
+            
+                }
+
+            }
+
+
+            // add timestamp
+
+            $this->updateOption('items_priority_update', time());
+        }
+        else {
+
+            $this->sendEmailError(
+
+                $this->option('email_error_sync_items_priority'),
+
+                'Error Sync Items Priority',
+
+                $response['body']
 
             );
+        }
+        return $response;
 
-            $product_id = 0;
-            $my_query = new \WP_Query($args);
-            if ($my_query->have_posts()) {
+    }
 
-                while ($my_query->have_posts()) {
+}
+$SyncItemCron = new SyncItemCron();
 
-                    $my_query->the_post();
 
-                    $product_id = get_the_ID();
 
-                }
-            }
-            // if product variation skip
-            if ($product_id != 0) {
-                update_post_meta($product_id, '_stock', $item['LAVI_TOTINVWEB']);
-                $product = wc_get_product($product_id);
-                if ($product->post_type == 'product_variation') {
-                    $var = new \WC_Product_Variation($product_id);
-                    $var->set_manage_stock(true);
-                    $var->save();
-                }
-                if ($product->post_type == 'product') {
-                    $product->set_manage_stock(true);
-                }
-                $product->save();
-            }
+
+//syncInventory
+
+// use WooCommercePriorityAPI\WooAPI;
+class SyncInventory extends \PriorityAPI\API {
+
+    private static $instance; // api instance
+    private $countries = []; // countries list
+
+
+    public static function instance()
+    {
+        if (is_null(static::$instance)) {
+            static::$instance = new static();
+        }
+
+        return static::$instance;
+    }
+    
+    public function __construct()
+    {
+  
+        add_action('syncInventory_cron_hook', array($this, 'simply_func_syncInventory_cron'));
+
+        if (!wp_next_scheduled('syncInventory_cron_hook')) {
+                
+            $res = wp_schedule_event(time(), 'one_hour', 'syncInventory_cron_hook');
 
         }
-        // add timestamp
 
-        WooAPI::instance()->updateOption('items_priority_update', time());
-    } else {
-
-        WooAPI::instance()->sendEmailError(
-
-            WooAPI::instance()->option('email_error_sync_items_priority'),
-
-            'Error Sync Items Priority',
-
-            $response['body']
-
-        );
     }
-    return $response;
+    
+    public function simply_func_syncInventory_cron()
+
+    {
+
+        $response = $this->makeRequest('GET', 'LOGPART?$select=PARTNAME,LAVI_TOTINVWEB&$filter=SHOWINWEB eq \'Y\'', [], $this->option('log_inventory_priority', false));
+        // check response status       
+
+        if ($response['status']) {
+
+            $response_data = json_decode($response['body_raw'], true);
+            foreach ($response_data['value'] as $item) {
+                // if product exsits, update price
+                $search_by_value = $item['PARTNAME'];
+                $args = array(
+
+                    'post_type' => array('product', 'product_variation'),
+
+                    'post_status' => array('publish', 'draft'),
+
+                    'meta_query' => array(
+
+                        array(
+
+                            'key' => '_sku',
+
+                            'value' => $search_by_value
+
+                        )
+
+                    )
+
+                );
+
+                $product_id = 0;
+                $my_query = new \WP_Query($args);
+                if ($my_query->have_posts()) {
+
+                    while ($my_query->have_posts()) {
+
+                        $my_query->the_post();
+
+                        $product_id = get_the_ID();
+
+                    }
+                }
+                // if product variation skip
+                if ($product_id != 0) {
+                    update_post_meta($product_id, '_stock', $item['LAVI_TOTINVWEB']);
+                    $product = wc_get_product($product_id);
+                    if ($product->post_type == 'product_variation') {
+                        $var = new \WC_Product_Variation($product_id);
+                        $var->set_manage_stock(true);
+                        $var->save();
+                    }
+                    if ($product->post_type == 'product') {
+                        $product->set_manage_stock(true);
+                    }
+   
+                    $product->save();
+                }
+
+            }
+            // add timestamp
+
+            $this->updateOption('items_priority_update', time());
+
+        } else {
+
+            $this->sendEmailError(
+
+                $this->option('email_error_sync_items_priority'),
+
+                'Error Sync Items Priority',
+
+                $response['body']
+
+            );
+        }
+        return $response;
+
+    }
 
 }
-
-add_action('syncInventory_cron_hook', 'simply_func_syncInventory_cron');
-
-if (!wp_next_scheduled('syncInventory_cron_hook')) {
-
-    $res = wp_schedule_event(time(), 'one_hour', 'syncInventory_cron_hook');
-
-}
+$syncInventory = new SyncInventory();
 
 //send email if order not sync
 
@@ -425,4 +507,6 @@ if (!wp_next_scheduled('check_order_not_sync_cron_hook')) {
 }
 
 
+
 ?>
+
