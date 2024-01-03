@@ -96,6 +96,84 @@ function simply_post_prospect_func($json)
     return $json;
 }
 
+//sync inventory from warehouse in priority to acf fields in the product
+add_action('sync_inventory_to_warehouse_in_product_cron_hook', 'sync_inventory_to_warehouse_in_product');
+// Schedule the task to run daily at midnight
+if (!wp_next_scheduled('sync_inventory_to_warehouse_in_product_cron_hook')) {
+    $res = wp_schedule_event(time(), 'daily', 'sync_inventory_to_warehouse_in_product_cron_hook');
+}
+
+function sync_inventory_to_warehouse_in_product() {
+    // get the items simply by time stamp of today
+    $daysback_options = explode(',', WooAPI::instance()->option('sync_inventory_warhsname'))[3];
+    $daysback = intval(!empty($daysback_options) ? $daysback_options : 1); // change days back to get inventory of prev days
+    $stamp = mktime(1 - ($daysback * 24), 0, 0);
+    $bod = date(DATE_ATOM, $stamp);
+    $url_addition = '('. rawurlencode('WARHSTRANSDATE ge ' . $bod . ' or PURTRANSDATE ge ' . $bod . ' or SALETRANSDATE ge ' . $bod) . ')';
+    
+    $response = WooAPI::instance()->makeRequest('GET', 'LOGPART?$select=PARTNAME&$filter='.$url_addition.' and INVFLAG eq \'Y\' &$expand=PARTBALANCE_SUBFORM',
+    [],  
+    WooAPI::instance()->option('log_inventory_priority', false));
+
+    // check response status 
+    if ($response['status']) {
+        $data = json_decode($response['body_raw'], true);
+
+        foreach ($data['value'] as $item) {
+            $args = array(
+                'post_type' => array('product', 'product_variation'),
+                'meta_query' => array(
+                    array(
+                        'key' => '_sku',
+                        'value' => $item['PARTNAME']
+                    )
+                )
+            );
+            $my_query = new \WP_Query($args);
+            if ($my_query->have_posts()) {
+                while ($my_query->have_posts()) {
+                    $my_query->the_post();
+                    $product_id = get_the_ID();
+                }
+            } else {
+                $product_id = 0;
+            }
+
+            if (!$product_id == 0) {
+                foreach($item['PARTBALANCE_SUBFORM'] as $warehouse) {
+                    $warehouse_name = $warehouse['WARHSNAME'];
+                    $quantity = $warehouse['TBALANCE'];
+
+                    switch ( $warehouse_name ) {
+                        case 'GEZR':
+                            update_field('gezer',  $quantity, $product_id);
+                            break;
+                        case 'HIFA':
+                            update_field('haifa',  $quantity, $product_id);
+                            break;
+                        case 'HERM':
+                            update_field('hertzelia',  $quantity, $product_id);
+                            break;
+                        case 'RISH':
+                            update_field('rishon',  $quantity, $product_id);
+                            break;
+                        case 'BSHV':
+                            update_field('beersheva',  $quantity, $product_id);
+                            break;
+                    }
+
+                }
+            }
+        }
+
+    } else {
+        WooAPI::instance()->sendEmailError(
+            WooAPI::instance()->option('email_error_sync_inventory_warehouse_in_product'),
+            'Error Sync Inventory warehouse in product',
+            $response['body']
+        );
+    }
+}
 
 // add_filter('simply_request_data','manipulate_order');
 // function manipulate_order($data){
