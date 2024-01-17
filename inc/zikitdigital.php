@@ -131,25 +131,7 @@ function simply_func($data)
 add_filter('woocommerce_package_rates', 'simply_change_shipping_method_based_on_cart_total', 11, 2);
 function simply_change_shipping_method_based_on_cart_total( $rates, $package ) {
 // here all the calculations
-// get total price סהכ מחיר
 
-
-//    $contentsCost = array_sum(wp_list_pluck(array_filter(WC()->cart->get_cart(), function ($item) {
-//        $product = $item['data'];
-//        return ($product && $product->needs_shipping());
-//    }), 'line_total'));
-   // global $woocommerce;
-   // $cart = $woocommerce->cart;
-    $tot_price= 0;
-//    foreach ( $cart->get_cart() as $cart_item_key => $cart_item ) {
-//        $product = $cart_item['data'];
-//        $quantity = $cart_item['quantity'];
-//        $line_total = $cart_item['line_total'];
-//        $tot_price =+   $line_total;
-//    }
-
-
-    //$tot_price = $package['contents_cost'];
     $cart_total = WC()->cart->get_cart_contents_total();
 //סהכ משקל
     $sum_weight = 0;
@@ -158,8 +140,16 @@ function simply_change_shipping_method_based_on_cart_total( $rates, $package ) {
     // סהכ עלות כוללת להזמנה ללא מעמ
     $total_price=0;
     foreach ( WC()->cart->get_cart() as $item ) {
-        // סהכ משקל בגרמים לעגלה
-        $product_weight = get_field('weight', $item['product_id']);
+// סהכ משקל בגרמים לעגלה
+        $_product = wc_get_product( $item['product_id']);
+
+        if( $_product->is_type( 'simple' )) {
+            $product_weight = get_field('weight', $item['product_id']);
+        }
+        else {
+            $product_weight = get_field('weight1', $item['variation_id']);
+        }
+
         //default weight
         if (!$product_weight) $product_weight = 0;
         $tot_weight_product = $item['quantity'] * $product_weight;
@@ -195,17 +185,6 @@ function simply_change_shipping_method_based_on_cart_total( $rates, $package ) {
 // סה"כ הנחה
     $tot_discounts= $discounts * 18;
 
-// discount_single סכום הנחה לבודד
-//    if($tot_price < 1200 && $tot_price >= 600){
-//        $discount_single = -18;
-//        $discount_qty = 1;
-//    }
-//    if($tot_price >= 1200 ){
-//        $discount_single = -36;
-//        $discount_qty = min(floor($tot_price/1200),$num_packs);
-//    }
-//// total_discount סהכ הנחה
-//    $total_discount = $discount_qty * $discount_single;
 
 // final cost and update
 
