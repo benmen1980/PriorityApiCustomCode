@@ -147,7 +147,7 @@ function simply_change_shipping_method_based_on_cart_total( $rates, $package ) {
             $product_weight = get_field('weight', $item['product_id']);
         }
         else {
-            $product_weight = get_field('weight1', $item['variation_id']);
+            $product_weight = get_post_meta($item['variation_id'], 'weight1', true);
         }
 
         //default weight
@@ -195,7 +195,7 @@ function simply_change_shipping_method_based_on_cart_total( $rates, $package ) {
     $rates['flat_rate:2'] -> cost = $shipping_cost; // flat_rate:3 is the name of the shipping method
     $newTax[1] = $shipping_cost * 0.17;
     $rates['flat_rate:2'] -> set_taxes($newTax);
-    
+
     return $rates;
 }
 
