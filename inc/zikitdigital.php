@@ -164,7 +164,7 @@ function simply_change_shipping_method_based_on_cart_total( $rates, $package ) {
 //סהכ משקל ניפחי לעגלה
         $product_volume = get_field('volume', $item['product_id']);
 //default volume
-        if (!$product_volume) $product_volume = 0;
+        if (!$product_volume) $product_volume = 1;
         $tot_volume_product = $item['quantity'] * $product_volume;
         $sum_volume+=$tot_volume_product;
 
