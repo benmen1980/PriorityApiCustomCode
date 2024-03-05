@@ -13,7 +13,7 @@ function simply_code_after_sync_inventory($product_id,$item){
         update_field('date_inventory', $date_invetury, $product_id);
     }
     else{
-//to variable product
+        //to variable product
         update_post_meta( $product_id, 'date_invetury_var', esc_attr( $date_invetury ) );
     }
 }
@@ -29,10 +29,10 @@ add_action('simply_update_product_data', function($item){
     $param9 = $item['SPEC9'];
     $param10 = $item['SPEC10'];
     $param11 = $item['SPEC11'];
-//update_post_meta( 68, 'quantity_box', 8 );
+    //update_post_meta( 68, 'quantity_box', 8 );
 
     $_product = wc_get_product( $item['product_id']);
-//$_product = wc_get_product( 68);
+    //$_product = wc_get_product( 68);
 
     if ($_product != 0 && $_product->is_type( 'simple' ) ) {
         if ($quantity_box) {
@@ -92,14 +92,14 @@ add_action('simply_update_variation_data', function($item) {
 
 add_filter('simply_sync_priority_customers_to_wp','simply_sync_priority_customers_to_wp');
 function simply_sync_priority_customers_to_wp($user){
-//    $wp_user_object = new WP_User($user['user_id']);
-//    $wp_user_object -> set_role('');
+    //    $wp_user_object = new WP_User($user['user_id']);
+    //    $wp_user_object -> set_role('');
 
     if($user['STATDES'] == 'מוגבל')
     {
         $wp_user_object = new WP_User($user['user_id']);
         $wp_user_object -> set_role('');
-//update_user_meta($user['user_id'], 'role', '');
+        //update_user_meta($user['user_id'], 'role', '');
     }
 
 }
@@ -123,28 +123,28 @@ function simply_func($data)
         $data['ORDSTATUSDES'] = "שולם באשראי";
     }
 
-// להוסיף אופציה של "סליקת אשראי". לדבג עם תוסף סליקה
+    // להוסיף אופציה של "סליקת אשראי". לדבג עם תוסף סליקה
 
-//להגדיר את ההנחה כללית להזמנה 0
+    //להגדיר את ההנחה כללית להזמנה 0
     $data['PERCENT'] = 0.0;
 
-//add more condition
+    //add more condition
     return $data;
 }
 
 add_filter('woocommerce_package_rates', 'simply_change_shipping_method_based_on_cart_total', 11, 2);
 function simply_change_shipping_method_based_on_cart_total( $rates, $package ) {
-// here all the calculations
+    // here all the calculations
 
     $cart_total = WC()->cart->get_cart_contents_total();
-//סהכ משקל
+    //סהכ משקל
     $sum_weight = 0;
-//סהכ משקל נפחי
+    //סהכ משקל נפחי
     $sum_volume = 0;
-// סהכ עלות כוללת להזמנה ללא מעמ
+    // סהכ עלות כוללת להזמנה ללא מעמ
     $total_price=0;
     foreach ( WC()->cart->get_cart() as $item ) {
-// סהכ משקל בגרמים לעגלה
+        // סהכ משקל בגרמים לעגלה
         $_product = wc_get_product( $item['product_id']);
 
         if( $_product->is_type( 'simple' )) {
@@ -154,43 +154,43 @@ function simply_change_shipping_method_based_on_cart_total( $rates, $package ) {
             $product_weight = get_post_meta($item['variation_id'], 'weight1', true);
         }
 
-//default weight
+        //default weight
         if (!$product_weight) $product_weight = 0;
         $tot_weight_product = $item['quantity'] * $product_weight;
         $sum_weight+=$tot_weight_product;
-//סיכום ידני לעלות כוללת לעגלה ללא מעמ בגלל התנגשות תוסף הנחות
-//  $total_price = (float) $item['custom_pricelist'];
+        //סיכום ידני לעלות כוללת לעגלה ללא מעמ בגלל התנגשות תוסף הנחות
+        //  $total_price = (float) $item['custom_pricelist'];
 
-//סהכ משקל ניפחי לעגלה
+        //סהכ משקל ניפחי לעגלה
         $product_volume = get_field('volume', $item['product_id']);
-//default volume
-        if (!$product_volume) $product_volume = 1;
+        //default volume
+        if (!$product_volume) $product_volume = 0;
         $tot_volume_product = $item['quantity'] * $product_volume;
         $sum_volume+=$tot_volume_product;
 
     }
-//get total weight  המרת סהכ משקל לק"ג
-// $tot_weight = $sum_weight / 1000;
+    //get total weight  המרת סהכ משקל לק"ג
+    // $tot_weight = $sum_weight / 1000;
     $tot_weight = $sum_weight;
-//   סהכ משקל ניפחי
+    //   סהכ משקל ניפחי
     $tot_volume=$sum_volume;
     if($tot_weight<$tot_volume){
         $tot_weight=$tot_volume;
     }
 
-// get number of packs כמות חבילות
+    // get number of packs כמות חבילות
     $num_packs = ceil($tot_weight / 19);
-// packs price מחיר חבילות
+    // packs price מחיר חבילות
     $packs_Price = 36 * $num_packs;
 
-//כמות הנחות
+    //כמות הנחות
     $discounts = floor($cart_total / 600);
 
-// סה"כ הנחה
+    // סה"כ הנחה
     $tot_discounts= $discounts * 18;
 
 
-// final cost and update
+    // final cost and update
 
     $shipping_cost = $packs_Price - $tot_discounts;
     if($shipping_cost<=0){
@@ -212,13 +212,17 @@ function simply_modify_orderitem($array){
 
     $data['ORDERITEMS_SUBFORM'][sizeof($data['ORDERITEMS_SUBFORM']) - 1]['ORDERITEMSTEXT_SUBFORM'] = ['TEXT' => $text];
 
-//adjust the discount percent
+    //adjust the discount percent
     unset($data['ORDERITEMS_SUBFORM'][sizeof($data['ORDERITEMS_SUBFORM']) - 1]['PERCENT']);
     $order = new \WC_Order($data['BOOKNUM']);
     $user = $order->get_user();
     $user_id = $order->get_user_id();
-    $percent_zikit = get_user_meta($user_id, 'customer_percents',true);
-    $percent_zikit= (int)$percent_zikit[0]['PERCENT'];
+    //$percent_zikit = get_the_author_meta($user_id, 'customer_percents');
+    $percent_zikit = '5%';
+    if (strpos($percent_zikit, '%') !== false) {
+
+        $percent_zikit = str_replace('%', '', $percent_zikit);
+    }
     $data['ORDERITEMS_SUBFORM'][sizeof($data['ORDERITEMS_SUBFORM']) - 1]['PERCENT'] = (int)$percent_zikit;
 
     $array['data'] = $data;
