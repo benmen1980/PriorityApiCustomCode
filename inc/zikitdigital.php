@@ -218,11 +218,13 @@ function simply_modify_orderitem($array){
     $user = $order->get_user();
     $user_id = $order->get_user_id();
     //$percent_zikit = get_the_author_meta($user_id, 'customer_percents');
-    $percent_zikit = '5%';
-    if (strpos($percent_zikit, '%') !== false) {
+    $percent_zikit = get_user_meta($user_id, 'customer_percents',true);
+    $percent_zikit= (int)$percent_zikit[0]['PERCENT'];
 
-        $percent_zikit = str_replace('%', '', $percent_zikit);
-    }
+//        if (strpos($percent_zikit, '%') !== false) {
+//
+//        $percent_zikit = str_replace('%', '', $percent_zikit);
+//        }
     $data['ORDERITEMS_SUBFORM'][sizeof($data['ORDERITEMS_SUBFORM']) - 1]['PERCENT'] = (int)$percent_zikit;
 
     $array['data'] = $data;
