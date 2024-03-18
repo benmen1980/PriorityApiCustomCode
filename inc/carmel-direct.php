@@ -20,7 +20,21 @@ function simply_func($data)
     print_r ($data);
     print_r ('<br/>');
     print_r ($data['PAYMENTDEF_SUBFORM']['PAYMENTCODE']);
-    
+
+    // third function logic
+    $id = $data['orderId'];
+    $order = new \WC_Order($id);
+    if ($order->get_payment_method_title() !== 'PayPal') {
+        $order_cc_meta = $order->get_meta('_transaction_data');
+        // data
+        $credittype = $order_cc_meta['CardHebrewName'];
+        if($credittype === 'אמריקן אקספרס') {
+            $data['PAYMENTDEF_SUBFORM']['PAYMENTCODE'] = '13';
+        }
+    }
+    print_r ('<br/>');
+    print_r ($data['PAYMENTDEF_SUBFORM']['PAYMENTCODE']);
+        
     // Return the modified data
     return $data;
 }
