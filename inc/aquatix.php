@@ -17,29 +17,15 @@
         $textToAdd =  $item['EPARTDES'];
         $id = $item['product_id'];
 
-        // Get the product and its current short description
-        $product = wc_get_product($id);
-        $short_description = $product->get_short_description();
-
-        $searchText = 'למוצרים נוספים מחברת:';
-
-        if (stripos($short_description, $textToAdd) === false) {
-
-            $position = stripos($short_description, $searchText);
-            if ($position !== false && !empty($short_description)) {
-
-                $text = substr_replace($short_description, '<p>' . $textToAdd . '</p>', $position, 0);
-                $text .= $searchText;
-            
-                // $text = $short_description . '<p>' . $textToAdd . '</p>';
-            } else if (!empty($short_description)){
-                $text = $short_description . '<p>' . $textToAdd . '</p>'; 
-            } else {
-                $text = $textToAdd;
-            }
-        $product->set_short_description($text);
-        $product->save();
-        } 
-        return $product;
+        update_field('product_description_language', $textToAdd, $id);
     });
+
+    add_filter('simply_request_data', 'simply_func');
+    function simply_func($data)
+    {
+        if (isset($data['CDES'])){
+            unset($data['CDES']);
+        };
+        return $data;
+    }
 ?>
