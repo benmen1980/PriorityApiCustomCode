@@ -24,7 +24,7 @@ function simply_func($data)
     // third function logic
     $id = $data['orderId'];
     $order = new \WC_Order($id);
-    if ($order->get_payment_method_title() !== 'PayPal') {
+    if ($order->get_payment_method_title() !== 'PayPal' && $order->get_payment_method_title() !== 'שובר BUYME -  GiftZone') {
         $order_cc_meta = $order->get_meta('_transaction_data');
         // data
         $credittype = $order_cc_meta['CardHebrewName'];
