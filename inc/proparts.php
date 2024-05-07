@@ -33,5 +33,49 @@ add_action('simply_update_product_data', function($item){
     } else {
         error_log("Manufacturer: '$manufacturer' not found.");
     } 
-    
+
+    if($item['product_id'] !== 0) {
+        $product = wc_get_product($item['product_id']);
+        $short_description = $item['SPEC1'] . ' ' . $item['SPEC2'];
+        $product->set_short_description($short_description);
+        
+        $description = $product->get_description();
+        $allowed_tags = '<p>';
+        $content = strip_tags($description, $allowed_tags);
+        $product->set_description($content);
+
+        $product->save();
+    }    
 });
+
+add_filter('simply_request_data', 'simply_func');
+function simply_func($data)
+{
+    if (isset($data['CDES'])){
+        unset($data['CDES']);
+    };
+    return $data;
+}
+
+add_filter('change_design_pricelist_qty_table', 'design_pricelist_qty_table');
+function design_pricelist_qty_table($data) {
+    ?>
+    <table style="width:100%!important" class="simply-tire-price-grid">
+        <tbody id="simply-tire-price-grid-rows">
+        <?php
+        foreach ($data as $item) {
+            $price = $item["price_list_price"];
+            $float_price = $price;
+            $quantity = $item["price_list_quant"];
+            $price_discount = $item["price_list_disprice"];
+            $percent = $item["price_list_percent"];
+            ?>
+            <tr class="price_list_tr" >
+                <td class="price_list_td"> <?php echo 'קנה <span class="simply-tire-quantity">' . $quantity . '</span> יחידות ב <strong class="simply-tire-price">₪<span class="simply-tire-price-float simply-tire-price-number">' . $price_discount. '</span></strong> ליחידה (כולל מע"מ) וחסוך ' . $percent . '%'?> </td>
+            </tr>
+            <?php
+        }
+        ?></tbody>
+    </table>
+    <?php
+}
