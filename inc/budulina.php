@@ -9,13 +9,19 @@ $available_inventory = $item['LOGCOUNTERS_SUBFORM'][0]['BALANCE']; //מלאי ז
 //הזמנת רכש ממחסן 50
 $purchase_order_warshname_50 = $item['PARTBALANCE_SUBFORM'][0]['TBALANCE'];
 
-if ( ($purchase_order > 0 && $available_inventory < 4) || ($purchase_order_warshname_50 > 0) ) {
+if ($purchase_order_warshname_50 > 0) {
     update_post_meta($product_id, '_backorders', 'notify');
     update_post_meta($product_id, '_backorder_description', $desc);
-}
-else{
-    update_post_meta($product_id, '_backorders', 'no');
-    update_post_meta($product_id, '_backorder_description', '');
+} 
+else {
+    if ( $purchase_order > 0 && $available_inventory < 4 ) {
+    update_post_meta($product_id, '_backorders', 'notify');
+    update_post_meta($product_id, '_backorder_description', $desc);
+    }
+    else{
+        update_post_meta($product_id, '_backorders', 'no');
+        update_post_meta($product_id, '_backorder_description', '');
+    }
 }
 
 return null;
@@ -32,8 +38,9 @@ function simply_syncInventoryPriority_filter_addition_func($url_addition)
     $bod = date(DATE_ATOM, $stamp);
 
     //$url_addition.= ' and SPEC20 eq \'Y\'';
-    $url_addition.= rawurlencode(' or UDATE ge ' . $bod) . ' and SPEC20 eq \'Y\'';
-    
+    //$url_addition.= rawurlencode(' or UDATE ge ' . $bod) . ' and SPEC20 eq \'Y\'';
+    $url_addition= '('. $url_addition .rawurlencode(' or UDATE ge ' . $bod) . ') and SPEC20 eq \'Y\' ';
+
     return $url_addition;
 }
 
