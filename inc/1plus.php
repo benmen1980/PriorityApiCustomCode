@@ -1,0 +1,2 @@
+<?php 
+use PriorityWoocommerceAPI\WooAPI;
