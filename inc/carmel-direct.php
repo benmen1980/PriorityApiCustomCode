@@ -251,7 +251,7 @@ function syncItemsPriority() {
    // get the items simply by time stamp of today
    $stamp          = mktime( 0 - $daysback * 24, 0, 0 );
    $bod            = date( DATE_ATOM, $stamp );
-   $date_filter    = 'UDATE ge ' . urlencode( $bod );
+   $date_filter    = 'PRIZ_UDATE ge ' . urlencode( $bod );
    // $date_filter    = 'PARTNAME eq \'RW-B201\'';
    $data['select'] = 'PARTNAME,PARTDES,BASEPLPRICE,VATPRICE,STATDES,BARCODE,SHOWINWEB,SPEC1,SPEC2,SPEC3,SPEC4,SPEC5,SPEC6,SPEC7,SPEC8,SPEC9,SPEC10,SPEC11,SPEC12,SPEC13,SPEC14,SPEC15,SPEC16,SPEC17,SPEC18,SPEC19,SPEC20,FAMILYDES,INVFLAG,FAMILYNAME';
    if ( $priority_version < 21.0 ) {
