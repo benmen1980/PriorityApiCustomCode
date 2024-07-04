@@ -10,10 +10,10 @@ function simply_func($data)
 
         $order_id = $data['orderId'];
         $order = new \WC_Order($order_id);
-        $data['REFERENCE']= $order->get_meta('טווח שעות');
-        $date_text = $order->get_meta('תאריך');
-        if(!is_null($date_text)){
-            $datetime = DateTime::createFromFormat('d/m/y', $date_text);
+        $data['REFERENCE']= $order->get_meta('_billing_delivery_timeset');
+        $date_text = $order->get_meta('_billing_delivery_day');
+        if(!empty($date_text)){
+            $datetime = DateTime::createFromFormat('d/m/Y', $date_text);
             $data['EXPIRYDATE'] = $datetime->format('Y-m-d');
             $data['DETAILS'] = '#'.$data['DETAILS'];
         }
@@ -37,6 +37,7 @@ function simply_func($data)
         $data['CPROFITEMS_SUBFORM'] = $items;
         // PAYMENTDEF
         unset($data['PAYMENTDEF_SUBFORM']);
+        unset($data['BOOKNUM']);
     }
     if($data['doctype']=='EINVOICES') {
         $id = $data['DETAILS'];
@@ -63,7 +64,7 @@ function simply_search_customer_in_priority($data){
         if($res['code']==200){
             $body =   json_decode($res['body']);
             $value = $body->value[0];
-            $custname =$value->WTAXNUM;
+            $custname =$value->CUSTNAME;
         } 
     } else {
         if($user_id) {
