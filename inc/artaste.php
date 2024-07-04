@@ -53,22 +53,36 @@ function simply_search_customer_in_priority($data){
     $order = $data['order'];
     $user_id = $data['user_id'];
     if($order){
+        $company_id =  get_post_meta($order->id, 'billing_invoice_id_type', true);
         $email =  strtolower($order->get_billing_email());
     }
-    if($user_id) {
-        if ($user = get_userdata($user_id)) {
-            $email = strtolower($user->data->user_email);
+    //Check if the customer already exists as a priority by the company's id
+    if (!empty($company_id)) {
+        $url_addition = 'CUSTOMERS?$filter=WTAXNUM eq \''.$company_id.'\'' ;
+        $res =  WooAPI::instance()->makeRequest('GET', $url_addition, [], true);
+        if($res['code']==200){
+            $body =   json_decode($res['body']);
+            $value = $body->value[0];
+            $custname =$value->WTAXNUM;
+        } 
+    } else {
+        if($user_id) {
+            if ($user = get_userdata($user_id)) {
+                $email = strtolower($user->data->user_email);
+            }
+            // Check if the customer already exists in priority by email
+            $url_addition = 'CUSTOMERS?$filter=EMAIL eq \''.$email.'\'' ;
+            $res =  WooAPI::instance()->makeRequest('GET', $url_addition, [], true);
+            if($res['code']==200){
+                $body =   json_decode($res['body']);
+                $value = $body->value[0];
+                $custname =$value->CUSTNAME;
+            } else{
+                $custname = null;
+            }
+        } else{
+            $custname = null;
         }
-    }
-    //check if customer already exist in priority
-    $url_addition = 'CUSTOMERS?$filter=EMAIL eq \''.$email.'\'' ;
-    $res =  WooAPI::instance()->makeRequest('GET', $url_addition, [], true);
-    if($res['code']==200){
-        $body =   json_decode($res['body']);
-        $value = $body->value[0];
-        $custname =$value->CUSTNAME;
-    }else{
-        $custname = null;
     }
     $data['CUSTNAME'] = $custname;
     return $data;

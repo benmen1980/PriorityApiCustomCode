@@ -253,11 +253,11 @@ function syncItemsPriority() {
    $bod            = date( DATE_ATOM, $stamp );
    $date_filter    = 'PRIZ_UDATE ge ' . urlencode( $bod );
    // $date_filter    = 'PARTNAME eq \'RW-B201\'';
-   $data['select'] = 'PARTNAME,PARTDES,BASEPLPRICE,VATPRICE,STATDES,BARCODE,SHOWINWEB,SPEC1,SPEC2,SPEC3,SPEC4,SPEC5,SPEC6,SPEC7,SPEC8,SPEC9,SPEC10,SPEC11,SPEC12,SPEC13,SPEC14,SPEC15,SPEC16,SPEC17,SPEC18,SPEC19,SPEC20,FAMILYDES,INVFLAG,FAMILYNAME';
+   $data['select'] = 'PARTNAME,VATPRICE,BASEPLPRICE,PRIZ_UDATE';
    if ( $priority_version < 21.0 ) {
        $data['select'] .= ',EXTFILENAME';
    }
-   $data['expand'] = '$expand=PARTUNSPECS_SUBFORM,PARTTEXT_SUBFORM,PARTINCUSTPLISTS_SUBFORM($select=PLNAME,PRICE,VATPRICE;$filter=PLNAME eq \'' . $product_price_list . '\')';
+   $data['expand'] = '$expand=PARTINCUSTPLISTS_SUBFORM($select=PLNAME,PRICE,VATPRICE,UDATE;$filter=PLNAME eq \'' . $product_price_list . '\')';
 
 
 
@@ -272,58 +272,64 @@ function syncItemsPriority() {
        $response_data = json_decode($response['body_raw'], true);
        try {
            foreach ( $response_data['value'] as $item ) {
-               if ( defined( 'WP_DEBUG' ) && true === WP_DEBUG ) {
-                   error_log($item['PARTNAME']);
-               }
+                if ( ! empty( $item['PARTINCUSTPLISTS_SUBFORM'] )) {
+                if ( defined( 'WP_DEBUG' ) && true === WP_DEBUG ) {
+                    error_log($item['PARTNAME']);
+                }
 
-               // $data = [
-               //     'post_author' => 1,
-               //     //'post_content' =>  $content,
-               //     'post_status' => WooAPI::instance()->option( 'item_status' ),
-               //     'post_title'  => $item['PARTDES'],
-               //     'post_parent' => '',
-               //     'post_type'   => 'product',
-               // ];
+                // $data = [
+                //     'post_author' => 1,
+                //     //'post_content' =>  $content,
+                //     'post_status' => WooAPI::instance()->option( 'item_status' ),
+                //     'post_title'  => $item['PARTDES'],
+                //     'post_parent' => '',
+                //     'post_type'   => 'product',
+                // ];
 
-               // if product exsits, update
-               $search_by_value = (string) $item[ $search_field ];
-               $args            = array(
-                   'post_type'   => array( 'product', 'product_variation' ),
-                   'post_status' => array( 'publish', 'draft' ),
-                   'meta_query'  => array(
-                       array(
-                           'key'   => $search_field_web,
-                           'value' => $search_by_value
-                       )
-                   )
-               );
-               $product_id      = 0;
-               $my_query        = new \WP_Query( $args );
-               if ( $my_query->have_posts() ) {
-                   while ( $my_query->have_posts() ) {
-                       $my_query->the_post();
-                       $product_id = get_the_ID();
-                   }
-               }
+                // if product exsits, update
+                $search_by_value = (string) $item[ $search_field ];
+                $args            = array(
+                    'post_type'   => array( 'product', 'product_variation' ),
+                    'post_status' => array( 'publish', 'draft' ),
+                    'meta_query'  => array(
+                        array(
+                            'key'   => $search_field_web,
+                            'value' => $search_by_value
+                        )
+                    )
+                );
+                $product_id      = 0;
+                $my_query        = new \WP_Query( $args );
+                if ( $my_query->have_posts() ) {
+                    while ( $my_query->have_posts() ) {
+                        $my_query->the_post();
+                        $product_id = get_the_ID();
+                    }
+                }
 
-               if ( $product_id == 0 ) {
-                   continue;
-               }
+                if ( $product_id == 0 ) {
+                    continue;
+                }
 
-               // update product
-               if ( $product_id != 0 ) {
-                   if ( $product_price_list != null && ! empty( $item['PARTINCUSTPLISTS_SUBFORM'] ) ) {
-                       $pri_price = wc_prices_include_tax() == true ? $item['PARTINCUSTPLISTS_SUBFORM'][0]['VATPRICE'] : $item['PARTINCUSTPLISTS_SUBFORM'][0]['PRICE'];
-   
-                   } else {
-                       $pri_price = wc_prices_include_tax() == true ? $item['VATPRICE'] : $item['BASEPLPRICE'];
-                   }
-                   update_post_meta($product_id, '_regular_price',$pri_price);
-                   update_post_meta($product_id, '_price',$pri_price);
-               }
-           }
+                // update product
+                if ( $product_id != 0 ) {
+                    if ( $product_price_list != null && ! empty( $item['PARTINCUSTPLISTS_SUBFORM'] ) ) {
+                        $pri_price = wc_prices_include_tax() == true ? $item['PARTINCUSTPLISTS_SUBFORM'][0]['VATPRICE'] : $item['PARTINCUSTPLISTS_SUBFORM'][0]['PRICE'];
+                        } else {
+                            $pri_price = wc_prices_include_tax() == true ? $item['VATPRICE'] : $item['BASEPLPRICE'];
+                        }
+                        if ($pri_price != 0 && $pri_price != "0") {
+                            update_post_meta($product_id, '_regular_price', $pri_price);
+                            update_post_meta($product_id, '_price', $pri_price);
+                        } else {
+                            update_post_meta($product_id, '_regular_price', '');
+                            update_post_meta($product_id, '_price', '');
+                        }
+                    }
+                }
+            }
            
-       } catch (Exception $e) {
+        } catch (Exception $e) {
        // Exception handling code
        echo "Exception caught: " . $e->getMessage();
         }
