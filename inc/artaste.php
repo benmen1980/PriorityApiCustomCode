@@ -107,4 +107,3 @@ function check_order_payment_method($order)
     }
     
 }
-   return $data;
