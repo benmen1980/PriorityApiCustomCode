@@ -41,26 +41,14 @@ function simply_func($data){
 	$data['STCODE'] = "40";
 
     $customer_id = $order->get_customer_id() ? $order->get_customer_id() : '0';
-    $data['AMB_CRMCUSTNAME'] = $customer_id;
+    //$data['AMB_CRMCUSTNAME'] = (string)$customer_id;
 
 	// billing customer details
-	$billing_first_name = $order->get_billing_first_name() ? $order->get_billing_first_name() : '0';
-	$billing_last_name  = $order->get_billing_last_name() ? $order->get_billing_last_name() : '0';
-	$billing_full_name  = $billing_first_name . ' ' . $billing_last_name;
-	$billing_building_number = get_post_meta( $order->get_id(), 'billing_building_number', true ) ? get_post_meta( $order->get_id(), 'billing_building_number', true ) : '0';
-	$billing_app_number      = get_post_meta( $order->get_id(), 'billing_app_number', true ) ? get_post_meta( $order->get_id(), 'billing_app_number', true ) : '0';
-	$billing_floor_number    = get_post_meta( $order->get_id(), 'billing_floor_number', true ) ? get_post_meta( $order->get_id(), 'billing_floor_number', true ) : '0';
+	$billing_building_number = get_post_meta( $order->get_id(), 'billing_building_number', true ) ? get_post_meta( $order->get_id(), 'billing_building_number', true ) : '';
+	$billing_app_number      = get_post_meta( $order->get_id(), 'billing_app_number', true ) ? get_post_meta( $order->get_id(), 'billing_app_number', true ) : '';
+	$billing_floor_number    = get_post_meta( $order->get_id(), 'billing_floor_number', true ) ? get_post_meta( $order->get_id(), 'billing_floor_number', true ) : '';
 
-	$customer_data = [
-
-		'PHONE' => $order->get_billing_phone(),
-		'EMAIL' => $order->get_billing_email(),
-		'ADRS' => $order->get_billing_address_1().' '.$billing_building_number,
-		'STATEA' => $order->get_billing_city(),
-		'ZIP' => $order->get_shipping_postcode(),
-	];
-
-	$data['AINVOICESCONT_SUBFORM'][] = $customer_data;
+	$data['ORDERSCONT_SUBFORM'][0]['ADRS'] = $order->get_billing_address_1().' '.$billing_building_number;
 
 	// Shipping address line.
 	$shipping_address_1       = $order->get_shipping_address_1();
@@ -91,9 +79,13 @@ function simply_func($data){
     ];
 
 	$data['SHIPTO2_SUBFORM'] = $shipping_data;
+	unset($data['PAYMENTDEF_SUBFORM']);
+	$payaccount = get_post_meta($order->get_id(), 'icredit_ccnum', true);
+	$payaccount = substr($payaccount, -4);
 
-	$order_total = $order->get_total();
-	$data['TOTPRICE'] = $order_total;
+	$data['PAYMENTDEF_SUBFORM']['payaccount'] = $payaccount;
+	$data['PAYMENTDEF_SUBFORM']['QPRICE'] = floatval($order->get_total());
+	$data['PAYMENTDEF_SUBFORM']['EMAIL'] = $order->get_billing_email();
 
 	return $data;
 }
@@ -118,6 +110,35 @@ function simply_modify_customer_number_func($cust_data)
 
     $cust_data['CUSTNAME'] = $client_number;
     return $cust_data;
+}
+
+//define select field for sync inventory
+add_filter('simply_syncInventoryPriority_data', 'simply_syncInventoryPriority_data_func');
+
+function simply_syncInventoryPriority_data_func($data)
+{
+	$expand = '$expand=LOGCOUNTERS_SUBFORM($select=AMB_BALANCE)';
+    $data['expand'] = $expand;
+    $data['select'] = 'PARTNAME, PARTDES, MPARTNAME, ADVA_PARTQUANT';
+    return $data;
+
+}
+
+add_filter('simply_syncInventoryPriority_filter_addition', 'simply_syncInventoryPriority_filter_addition_func');
+
+function simply_syncInventoryPriority_filter_addition_func($url_addition)
+
+{
+    $daysback_options = explode(',', WooAPI::instance()->option('sync_inventory_warhsname'))[3];
+    $daysback = intval(!empty($daysback_options) ? $daysback_options : 1); // change days back to get inventory of prev days
+    $stamp = mktime(1 - ($daysback * 24), 0, 0);
+    $bod = date(DATE_ATOM, $stamp);
+
+    //$url_addition.= ' and SPEC20 eq \'Y\'';
+    //$url_addition.= rawurlencode(' or UDATE ge ' . $bod) . ' and SPEC20 eq \'Y\'';
+    $url_addition = $url_addition .' and SAPI_SYNC  eq \'Y\' and SPEC14 eq \'סופהרב\'';
+	//$url_addition = 'PARTNAME eq \'SU2124TB30\' or PARTNAME eq \'SU4204CP60\'';
+    return $url_addition;
 }
 
 // define new field to set stock
