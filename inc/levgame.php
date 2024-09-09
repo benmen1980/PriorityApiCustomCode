@@ -101,7 +101,7 @@ function mail_sent_sync_dialogue_func($contact_form) {
 
 }
 
-//get tranzila payment details- different from standart
+//get tranzila payment details- different from standart for order
 add_filter('simply_request_data', 'simply_func');
 function simply_func($data){
 
@@ -119,5 +119,26 @@ function simply_func($data){
     $data['PAYMENTDEF_SUBFORM']['CONFNUM'] = $confnum;
     $data['PAYMENTDEF_SUBFORM']['CCUID'] = $ccuid;
 
+    return $data;
+}
+
+//get tranzila payment details- different from standart for receipt
+add_filter('simply_request_data_receipt', 'simply_func_receipt');
+function simply_func_receipt($data){
+
+    $order_id = $data['BOOKNUM'];
+    $order = new \WC_Order($order_id);
+
+    $validmonth = !empty(get_post_meta($order->get_id(), 'cc_expmonth', true)) ? get_post_meta($order->get_id(), 'cc_expmonth', true) . '/' . get_post_meta($order->get_id(), 'cc_expyear', true) : '';
+    $confnum = $order->get_meta('cc_company_approval_num');
+    $ccuid = $order->get_meta('cc_order_token');
+
+    unset($data['TPAYMENT2_SUBFORM']);
+    $data['TPAYMENT2_SUBFORM']['QPRICE'] = floatval($order->get_total());
+    $data['TPAYMENT2_SUBFORM']['PAYMENTCODE'] = '10';
+    $data['TPAYMENT2_SUBFORM']['VALIDMONTH'] = $validmonth;
+    $data['TPAYMENT2_SUBFORM']['CONFNUM'] = $confnum;
+    $data['TPAYMENT2_SUBFORM']['CCUID'] = $ccuid;
+    $data['TPAYMENT2_SUBFORM']['PAYDATE'] = date('Y-m-d');
     return $data;
 }
