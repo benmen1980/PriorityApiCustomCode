@@ -82,10 +82,39 @@ function simply_func($data){
 	unset($data['PAYMENTDEF_SUBFORM']);
 	$payaccount = get_post_meta($order->get_id(), 'icredit_ccnum', true);
 	$payaccount = substr($payaccount, -4);
-
+	$data['PAYMENTDEF_SUBFORM']['PAYMENTCODE'] = "24"; 
 	$data['PAYMENTDEF_SUBFORM']['payaccount'] = $payaccount;
 	$data['PAYMENTDEF_SUBFORM']['QPRICE'] = floatval($order->get_total());
 	$data['PAYMENTDEF_SUBFORM']['EMAIL'] = $order->get_billing_email();
+
+	//set coupon to vprice instead vatprice
+	$coupon = $order->get_coupon_codes();
+	$items = [];
+    foreach($data['ORDERITEMS_SUBFORM'] as $item ){
+        if($item['PARTNAME']=='000'){
+			$vatprice = $item['VATPRICE'];
+			unset($item['VATPRICE']);
+            $item['VPRICE'] =  $vatprice;
+			if(!empty($coupon)){
+				$item['PDES'] = $coupon[0];
+			}
+			
+        }
+        $items[] = $item;
+    }
+    $data['ORDERITEMS_SUBFORM'] = $items;
+
+
+	//add partname 60 for איסוף עצמי
+	if ( 'איסוף עצמי' === $order_shipping_method ) {
+		$data['ORDERITEMS_SUBFORM'][] = [
+			'PARTNAME' => '60',
+			'TQUANT' => (int)1,
+			'PDES' => $order_shipping_method,
+			'DUEDATE' => date('Y-m-d'),
+			'VATPRICE' => 0
+		];
+	}
 
 	return $data;
 }
@@ -136,7 +165,7 @@ function simply_syncInventoryPriority_filter_addition_func($url_addition)
 
     //$url_addition.= ' and SPEC20 eq \'Y\'';
     //$url_addition.= rawurlencode(' or UDATE ge ' . $bod) . ' and SPEC20 eq \'Y\'';
-    $url_addition = $url_addition .' and SAPI_SYNC  eq \'Y\' and SPEC14 eq \'סופהרב\'';
+    $url_addition = $url_addition .' and SAPI_SYNC  eq \'Y\' and SPEC15 eq \'סופהרב\'';
 	//$url_addition = 'PARTNAME eq \'SU2124TB30\' or PARTNAME eq \'SU4204CP60\'';
     return $url_addition;
 }
