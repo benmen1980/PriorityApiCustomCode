@@ -8,6 +8,7 @@ function simply_syncInventoryPriority_data_func($data)
     return $data;
 }
 
+//עדכון מלאי לפי מלאי זמין
 add_filter('simply_sync_inventory_priority', 'simply_sync_inventory_priority_func');
 function simply_sync_inventory_priority_func($item)
 {
@@ -15,7 +16,7 @@ function simply_sync_inventory_priority_func($item)
     return $item;
 }
 
-
+//prevent shop for product with spec10 =yes
 function simply_code_after_sync_inventory($product_id,$item) {
     $manage_inventory = $item['SPEC10'];
 
@@ -28,6 +29,7 @@ function simply_code_after_sync_inventory($product_id,$item) {
 
 }
 
+//add filter by udate for product with change in spec10, to be included in the inventory sync
 add_filter('simply_syncInventoryPriority_filter_addition', 'simply_syncInventoryPriority_filter_addition_func');
 
 function simply_syncInventoryPriority_filter_addition_func($url_addition)
@@ -148,10 +150,10 @@ function simply_func($data){
     $data['PAYMENTDEF_SUBFORM']['CCUID'] = $ccuid;
 	
 	//change priority status for canceled order
-    $order_status = $order->get_status();
-    if($order_status == 'cancelled'){
-        $data['ORDSTATUSDES'] = "מבוטלת באתר";
-    }
+    // $order_status = $order->get_status();
+    // if($order_status == 'cancelled'){
+    //     $data['ORDSTATUSDES'] = "מבוטלת באתר";
+    // }
 
     return $data;
 }
