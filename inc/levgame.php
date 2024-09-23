@@ -178,3 +178,26 @@ function simply_func_receipt($data){
     $data['TPAYMENT2_SUBFORM'][0]['PAYDATE'] = date('Y-m-d');
     return $data;
 }
+
+//define select field for sync item
+add_filter('simply_syncItemsPriority_data', 'simply_syncItemsPriority_data_func');
+function simply_syncItemsPriority_data_func($data)
+{
+	$data['select'] = 'PARTNAME,BARCODE,PARTDES,VATPRICE,SHOWINWEB,INVFLAG,STATDES';
+	return $data;
+}
+
+//allow only to update price if product already exist
+add_action('simply_update_product_price', 'simply_update_product_price_func');
+function simply_update_product_price_func($item)
+{
+	//$stop_processing = true;
+    $product_id = $item['product_id'];
+	$pri_price = $item['VATPRICE'];
+	//$product_status = get_post_status($product_id);
+	$my_product = wc_get_product( $product_id );
+	//if ($product_status == 'publish') {
+	$my_product->set_regular_price( $pri_price );
+	$my_product->save();
+	//}
+}
