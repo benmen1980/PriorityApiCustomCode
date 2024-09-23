@@ -109,7 +109,7 @@ function simply_sync_receipt_true_func($order){
     $order_id = $data['orderId'];
     $order = new \WC_Order($order_id);
     $orderPayment = wc_get_payment_gateway_by_order($order);
-    if($orderPayment->id =='cheque' || $orderPayment->id =='creditguard'){
+    if($orderPayment->id =='creditguard'){
         return true;
     }
     else{
