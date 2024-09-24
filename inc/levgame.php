@@ -201,3 +201,26 @@ function simply_update_product_price_func($item)
 	$my_product->save();
 	//}
 }
+
+add_action('simply_update_variation_data','simply_update_variation_data_func');
+function simply_update_variation_data_func($item){
+    $show_in_web = $item['SHOWINWEB'];
+    $variation_id = $item['variation_id'];
+    $product = wc_get_product($variation_id);
+    if($show_in_web == 'y'){
+        $priceDisplay = get_option('woocommerce_prices_include_tax');
+        $pri_price = ($priceDisplay == 'yes') ? $item['VATPRICE'] : $item['BASEPLPRICE'];
+        update_post_meta($variation_id, '_regular_price',$pri_price);
+        //$product->set_status('publish');
+        $product->save();
+    }
+    // else{
+    //     $product->set_status('draft');
+    //     $product->save();
+    // } 
+}
+
+add_action('simply_sync_new_products', 'simply_sync_new_products_func');
+function simply_sync_new_products_func($item){
+    return false;
+}

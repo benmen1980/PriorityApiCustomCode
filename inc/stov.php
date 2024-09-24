@@ -512,8 +512,11 @@ function simply_func($data){
     $data['ORDERSCONT_SUBFORM'][0]['ADRS3'] = __( 'floor:', 'woodmart' ).$billing_address_floor.' '.__( 'apartment:', 'woodmart' ).$billing_address_apartment.' '.__( 'entrance:', 'woodmart' ).$billing_address_entrance;
     $data['SHIPTO2_SUBFORM']['ADDRESS3'] = __( 'floor:', 'woodmart' ).$shipping_address_floor.' '.__( 'apartment:', 'woodmart' ).$shipping_address_apartment.' '.__( 'entrance:', 'woodmart' ).$shipping_address_entrance;
 
-    $token =  $order->get_meta('CardcomToken');
-    $data['PAYMENTDEF_SUBFORM']['CCUID'] = $token;
+    //$token =  $order->get_meta('CardcomToken');
+    //$data['PAYMENTDEF_SUBFORM']['CCUID'] = $token;
+    $order_cc_meta = $order->get_meta('_transaction_data');
+    $idnum = $order_cc_meta['CardHolderID'];
+    $data['PAYMENTDEF_SUBFORM']['IDNUM'] = $idnum;
    
     return $data;
 }
