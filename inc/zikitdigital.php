@@ -83,6 +83,7 @@ add_action('simply_update_variation_data', function($item) {
     update_post_meta( $item['variation_id'], 'volume', $volume );
     is_numeric($weight) ? $weight : 0;
     update_post_meta( $item['variation_id'], 'weight1', $weight );
+    update_post_meta( $item['variation_id'], '_weight', $weight );
     update_post_meta( $item['variation_id'], 'param8', $param8 );
     update_post_meta( $item['variation_id'], 'param9', $param9 );
     update_post_meta( $item['variation_id'], 'param10', $param10 );
@@ -238,7 +239,14 @@ function simply_modify_orderitem($array){
 //        $percent_zikit = str_replace('%', '', $percent_zikit);
 //        }
     $data['ORDERITEMS_SUBFORM'][sizeof($data['ORDERITEMS_SUBFORM']) - 1]['PERCENT'] = (int)$percent_zikit;
-
+    
+    //set vatprice instead of vprice
+    // unset($data['ORDERITEMS_SUBFORM'][sizeof($data['ORDERITEMS_SUBFORM']) - 1]['VPRICE']);
+    // $quantity = (int)$item->get_quantity();
+    // $line_tax = (float)$item->get_subtotal_tax();
+    // $line_after_discount = (float)$item->get_total();
+    // $line_before_discount = (float)$item->get_subtotal();
+    // $data['ORDERITEMS_SUBFORM'][sizeof($data['ORDERITEMS_SUBFORM']) - 1]['VATPRICE'] = ($line_before_discount +  $line_tax) * $quantity;
     $array['data'] = $data;
     return $array;
 

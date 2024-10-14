@@ -517,6 +517,11 @@ function simply_func($data){
     $order_cc_meta = $order->get_meta('_transaction_data');
     $idnum = $order_cc_meta['CardHolderID'];
     $data['PAYMENTDEF_SUBFORM']['IDNUM'] = $idnum;
+    $ccuid = $order_cc_meta['Token'];
+	//append tk578 to ccuid number
+	$data['PAYMENTDEF_SUBFORM']['CCUID'] = 'tk578'.$ccuid;
+	//remove confnum
+	unset($data['PAYMENTDEF_SUBFORM']['CONFNUM']);
    
     return $data;
 }
