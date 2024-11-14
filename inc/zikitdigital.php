@@ -145,6 +145,22 @@ function simply_func($data)
     return $data;
 }
 
+//add another email recipient for creditguard
+add_filter( 'woocommerce_email_recipient_new_order', 'payment_id_based_new_order_email_recipient', 10, 2 );
+function payment_id_based_new_order_email_recipient( $recipient, $order ){
+    // Avoiding backend displayed error in Woocommerce email settings (mandatory)
+    if( ! is_a($order, 'WC_Order') ) 
+        return $recipient;
+
+    // Here below set in the array the desired payment Ids
+    $orderPayment = wc_get_payment_gateway_by_order($order);
+   
+    if($orderPayment->id =='creditguard') {
+        $recipient .= ', ccpayzikit@gmail.com';
+    } 
+    return $recipient;
+}
+
 add_filter('woocommerce_package_rates', 'simply_change_shipping_method_based_on_cart_total', 11, 2);
 function simply_change_shipping_method_based_on_cart_total( $rates, $package ) {
     // here all the calculations
