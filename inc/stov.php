@@ -32,7 +32,7 @@ function syncItemsPriority() {
     $date_filter    = 'UDATE ge ' . urlencode( $bod );
     // $date_filter    = 'PARTNAME eq \'RW-B201\'';
     $data['select'] = 'PARTNAME,PARTDES,REUT_SUBTITLE,REUT_ISBN,REUT_DANACODE,VATPRICE,BASEPLPRICE,SPEC1,SPEC5,EXTFILENAME,INVFLAG,SHOWINWEB,SERNFLAG';
-    $data['expand'] = '$expand=ECPARTCATEGORIES_SUBFORM($select=ECATCODE,REUT_SUBECATCODE,REUT_SUBSUBCATCODE),REUT_AUTHORS_SUBFORM($select=NAME_AUTH),REUT_TRAN_SUBFORM($select=NAME_TRAN),PARTTEXT_SUBFORM($select=TEXT),PARTUNSPECS_SUBFORM($select=VALUE)';
+    $data['expand'] = '$expand=ECPARTCATEGORIES_SUBFORM($select=ECATCODE,REUT_SUBECATCODE,REUT_SUBSUBCATCODE),REUT_AUTHORS_SUBFORM($select=NAME_AUTH),REUT_TRAN_SUBFORM($select=NAME_TRAN),PARTTEXT_SUBFORM($select=TEXT),,REUT_LABELSFORBOOK_SUBFORM($select=REUT_BOOKLABEL),REUT_PUBLISHERS_SUBFORM($select=PUBLISHER)';
 
     //$response = WooAPI::instance()->makeRequest( 'GET',
     //'LOGPART?$select=' . $data['select'] . '&$filter=' . $date_filter . ' and PARTNAME eq \'ORB-2558\' and ISMPART ne \'Y\' ' . $url_addition_config .
@@ -214,32 +214,66 @@ function syncItemsPriority() {
                 if ( $is_attrs != false ) {
 					unset($thedata);
                     //תגיות מוצר נוספות
-                    if(isset($item['PARTUNSPECS_SUBFORM'])){
-                        foreach ( $item['PARTUNSPECS_SUBFORM'] as $attribute ) {
-                            $attr_name  = 'תגיות מוצר נוספות';
-                            $attr_slug  = 'product-tag-badge';
-                            $attr_value = $attribute['VALUE'];
-                            if ( ! WooAPI::instance()->is_attribute_exists( $attr_slug ) ) {
-                                $attribute_id = wc_create_attribute(
-                                    array(
-                                        'name'         => $attr_name,
-                                        'slug'         => $attr_slug,
-                                        'type'         => 'select',
-                                        'order_by'     => 'menu_order',
-                                        'has_archives' => 0,
-                                    )
-                                );
-                            }
-                            wp_set_object_terms( $id, $attr_value, 'pa_' . $attr_slug, false );
-							$thedata['pa_' . $attr_slug] = array(
-                                'name' => 'pa_' . $attr_slug,
-                                'value' => '',
-                                'is_visible' => '1',
-                                'is_taxonomy' => '1'
-                            );
+                    //old code
+                    // if(isset($item['PARTUNSPECS_SUBFORM'])){
+                    //     foreach ( $item['PARTUNSPECS_SUBFORM'] as $attribute ) {
+                    //         $attr_name  = 'תגיות מוצר נוספות';
+                    //         $attr_slug  = 'product-tag-badge';
+                    //         $attr_value = $attribute['VALUE'];
+                    //         if ( ! WooAPI::instance()->is_attribute_exists( $attr_slug ) ) {
+                    //             $attribute_id = wc_create_attribute(
+                    //                 array(
+                    //                     'name'         => $attr_name,
+                    //                     'slug'         => $attr_slug,
+                    //                     'type'         => 'select',
+                    //                     'order_by'     => 'menu_order',
+                    //                     'has_archives' => 0,
+                    //                 )
+                    //             );
+                    //         }
+                    //         wp_set_object_terms( $id, $attr_value, 'pa_' . $attr_slug, false );
+					// 		$thedata['pa_' . $attr_slug] = array(
+                    //             'name' => 'pa_' . $attr_slug,
+                    //             'value' => '',
+                    //             'is_visible' => '1',
+                    //             'is_taxonomy' => '1'
+                    //         );
                             
-                        }
-                    }
+                    //     }
+                    // }
+                    if (isset($item['REUT_LABELSFORBOOK_SUBFORM'])) {
+						$attr_name  = 'תגיות מוצר נוספות';
+						$attr_slug  = 'product-tag-badge';
+
+						// Ensure the attribute exists before setting terms
+						if (!WooAPI::instance()->is_attribute_exists($attr_slug)) {
+							$attribute_id = wc_create_attribute(
+								array(
+									'name'         => $attr_name,
+									'slug'         => $attr_slug,
+									'type'         => 'select',
+									'order_by'     => 'menu_order',
+									'has_archives' => 0,
+								)
+							);
+						}
+
+						// Collect all tag values into an array
+						$tag_values = array_map(function($attribute) {
+							return $attribute['REUT_BOOKLABEL'];
+						}, $item['REUT_LABELSFORBOOK_SUBFORM']);
+
+						// Set all tag terms at once, replacing any existing terms
+						wp_set_object_terms($id, $tag_values, 'pa_' . $attr_slug, false);
+
+						// Update the product attributes data
+						$thedata['pa_' . $attr_slug] = array(
+							'name'        => 'pa_' . $attr_slug,
+							'value'       => '',
+							'is_visible'  => '1',
+							'is_taxonomy' => '1',
+						);
+					}
                     
                     //הוצאה לאור
                     if(isset($item['SPEC1'])){
@@ -264,6 +298,41 @@ function syncItemsPriority() {
                                 'is_visible' => '1',
                                 'is_taxonomy' => '1'
                             );
+                    }
+                    // הוצאה לאור
+                    //replace spec1 change when reut will update us
+                    if (isset($item['REUT_PUBLISHERS_SUBFORM'])) {
+                        $attr_name  = 'הוצאה לאור';
+                        $attr_slug  = 'הוצאה-לאור';
+
+                       // Ensure the attribute exists before setting terms
+                       if (!WooAPI::instance()->is_attribute_exists($attr_slug)) {
+                           $attribute_id = wc_create_attribute(
+                               array(
+                                   'name'         => $attr_name,
+                                   'slug'         => $attr_slug,
+                                   'type'         => 'select',
+                                   'order_by'     => 'menu_order',
+                                   'has_archives' => 0,
+                               )
+                           );
+                       }
+
+                       // Collect all tag values into an array
+                       $publisher_values = array_map(function($attribute) {
+                           return $attribute['PUBLISHER'];
+                       }, $item['REUT_PUBLISHERS_SUBFORM']);
+
+                       // Set all tag terms at once, replacing any existing terms
+                       wp_set_object_terms($id, $publisher_values, 'pa_' . $attr_slug, false);
+
+                       // Update the product attributes data
+                       $thedata['pa_' . $attr_slug] = array(
+                           'name'        => 'pa_' . $attr_slug,
+                           'value'       => '',
+                           'is_visible'  => '1',
+                           'is_taxonomy' => '1',
+                       );
                     }
 
                     //שנת הוצאה
@@ -292,32 +361,66 @@ function syncItemsPriority() {
                     }
 
                     //סופר
-                    if(isset($item['REUT_AUTHORS_SUBFORM'])){
-                        foreach ( $item['REUT_AUTHORS_SUBFORM'] as $attribute ) {
-                            $attr_name  = 'סופר';
-                            $attr_slug  = 'book-author';
-                            $attr_value = $attribute['NAME_AUTH'];
-                            if ( ! WooAPI::instance()->is_attribute_exists( $attr_slug ) ) {
-                                $attribute_id = wc_create_attribute(
-                                    array(
-                                        'name'         => $attr_name,
-                                        'slug'         => $attr_slug,
-                                        'type'         => 'select',
-                                        'order_by'     => 'menu_order',
-                                        'has_archives' => 0,
-                                    )
-                                );
-                            }
-                            wp_set_object_terms( $id, $attr_value, 'pa_' . $attr_slug, false );
-							$thedata['pa_' . $attr_slug] = array(
-                                'name' => 'pa_' . $attr_slug,
-                                'value' => '',
-                                'is_visible' => '1',
-                                'is_taxonomy' => '1'
-                            );
+                    // if(isset($item['REUT_AUTHORS_SUBFORM'])){
+                    //     foreach ( $item['REUT_AUTHORS_SUBFORM'] as $attribute ) {
+                    //         $attr_name  = 'סופר';
+                    //         $attr_slug  = 'book-author';
+                    //         $attr_value = $attribute['NAME_AUTH'];
+                    //         if ( ! WooAPI::instance()->is_attribute_exists( $attr_slug ) ) {
+                    //             $attribute_id = wc_create_attribute(
+                    //                 array(
+                    //                     'name'         => $attr_name,
+                    //                     'slug'         => $attr_slug,
+                    //                     'type'         => 'select',
+                    //                     'order_by'     => 'menu_order',
+                    //                     'has_archives' => 0,
+                    //                 )
+                    //             );
+                    //         }
+                    //         wp_set_object_terms( $id, $attr_value, 'pa_' . $attr_slug, false );
+					// 		$thedata['pa_' . $attr_slug] = array(
+                    //             'name' => 'pa_' . $attr_slug,
+                    //             'value' => '',
+                    //             'is_visible' => '1',
+                    //             'is_taxonomy' => '1'
+                    //         );
                             
+                    //     }
+                    // }
+                    if (isset($item['REUT_AUTHORS_SUBFORM'])) {
+                        $attr_name  = 'סופר';
+                        $attr_slug  = 'book-author';
+                        
+                        // Ensure the attribute exists before setting terms
+                        if (!WooAPI::instance()->is_attribute_exists($attr_slug)) {
+                            $attribute_id = wc_create_attribute(
+                                array(
+                                    'name'         => $attr_name,
+                                    'slug'         => $attr_slug,
+                                    'type'         => 'select',
+                                    'order_by'     => 'menu_order',
+                                    'has_archives' => 0,
+                                )
+                            );
                         }
+                    
+                        // Collect author names into an array
+                        $author_names = array_map(function($attribute) {
+                            return $attribute['NAME_AUTH'];
+                        }, $item['REUT_AUTHORS_SUBFORM']);
+                    
+                        // Set all author names at once, replacing any existing terms
+                        wp_set_object_terms($id, $author_names, 'pa_' . $attr_slug, false);
+                    
+                        // Update the product attributes data
+                        $thedata['pa_' . $attr_slug] = array(
+                            'name'        => 'pa_' . $attr_slug,
+                            'value'       => '',
+                            'is_visible'  => '1',
+                            'is_taxonomy' => '1',
+                        );
                     }
+                    
 					 if ( ! empty( ( $thedata ) ) ) {
                         update_post_meta($id, '_product_attributes', $thedata);
                     }
