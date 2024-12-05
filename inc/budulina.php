@@ -58,79 +58,60 @@ function simply_syncInventoryPriority_data_func($data)
 
 }
 
-add_action('syncPriorityCompletedOrderStatus_hook', 'syncPriorityCompletedOrderStatus');
 
-if (!wp_next_scheduled('syncPriorityCompletedOrderStatus_hook')) {
+add_action('syncPriorityCompletedOrderStatuses_cron_hook', 'syncPriorityCompletedOrderStatus');
 
-   $res = wp_schedule_event(time(), 'tenminutes', 'syncPriorityCompletedOrderStatus_hook');
+if (!wp_next_scheduled('syncPriorityCompletedOrderStatuses_cron_hook')) {
+
+   $res = wp_schedule_event(time(), 'hourly', 'syncPriorityCompletedOrderStatuses_cron_hook');
 
 }
 
 function syncPriorityCompletedOrderStatus(){
-    
-    $daysback = 10;
+    $daysback = 1;
     $stamp = mktime(0 - $daysback * 24, 0, 0);
     $bod = date(DATE_ATOM, $stamp);
     $date_filter = 'UDATE ge ' . urlencode($bod);
     $data['select'] = 'UDATE,STCODE,STDES,DISTRDATE,AIRWAYBILL,STATDES,REFERENCE';
-    $additionalurl = 'DOCUMENTS_D?$select=STCODE,STDES,DISTRDATE,AIRWAYBILL,STATDES,REFERENCE&$filter='.$date_filter.' and REFERENCE ne \'\' and STATDES eq \'סופית\' ';
+    $additionalurl = 'DOCUMENTS_D?$select=STCODE,STDES,DISTRDATE,AIRWAYBILL,STATDES,REFERENCE,DOCNO,TYPE&$expand=DOCORDI_SUBFORM&$filter='.$date_filter.' and REFERENCE ne \'\' and STATDES eq \'סופית\' ';
     $response_doc = WooAPI::instance()->makeRequest( "GET", $additionalurl, [], true );
     if($response_doc['code'] == '200'){
         $doc_shippings     = json_decode( $response_doc['body'], true )['value'];
         foreach($doc_shippings as $data){
             $statedes = $data['STATDES'];
             $order_id = intval($data['REFERENCE']);
-            $unixTime = strtotime($data['DISTRDATE']);
-            $distrDate = date("d-m-Y", $unixTime);
-            $note = ' נשלח ב'.$data['STDES'].' בתאריך '.$distrDate;
-            write_to_custom_log('update notes for '.$order_id);
             $order = wc_get_order($order_id);
-            if ( ! $order ) {
-                write_to_custom_log($order_id.' is not a valid WooCommerce order.');
+            write_to_custom_log('update status for '.$order_id);
+            $docordiSubform = $data['DOCORDI_SUBFORM'];
+            //skip order that i have anither partname not shipping closed
+            if (!empty($docordiSubform)) {
+                foreach ($docordiSubform as $item) {
+                    if (isset($item['PARTNAME']) && $item['PARTNAME'] !== "000") {
+                        write_to_custom_log($order_id.' not completed because another item');
+                        continue 2;
+                    }
+                }
             }
-            else{
+            if ( $order && $order->get_status() !== 'completed' ) {
+                $unixTime = strtotime($data['DISTRDATE']);
+                $distrDate = date("d-m-Y", $unixTime);
+                $note = ' נשלח ב'.$data['STDES'].' בתאריך '.$distrDate;
                 $order->add_order_note( $note );
                 $order->update_status( 'completed' );
-                $order_status = get_order_status($order_id);
-                write_to_custom_log($order_id.' has status: '.$order_status);
-            }        
+                write_to_custom_log($order_id.' has status completed');
+            }       
         }  
     }
     else{
-        write_to_custom_log('error get documents_d for'.$ord_name);
+        write_to_custom_log('error get documents_d');
         WooAPI::instance()->sendEmailError(
-            get_bloginfo('admin_email'),
-            'Error Update Order from priority to website',
+            array(get_bloginfo('admin_email'),'liora@budulina.co.il'),
+            'כשל סגירת תעודת באתר',
             $response_doc['body']
         );
     } 
 }
 
-
-// function syncPriorityCompletedOrderStatus() {
-//     // $query = new WC_Order_Query( array(
-//     //     'limit'        => -1, // Get all matching orders
-//     //     'status'       => array( 'processing', 'on-hold', 'wc-on-hold'), // Exclude 'completed' and 'cancelled'
-//     //     'return'       => 'objects', // Return as WC_Order objects
-//     // ) );
-
-//     // // Get the orders
-//     // $orders = $query->get_orders();
-//     // $order_ids = [];
-//     // if ( ! empty( $orders ) ) {
-//     //     foreach ( $orders as $order ) {
-//     //         $order_id = $order->get_id();
-//     //         $order_ids[] = $order_id;
-//     //     }
-//     //     $ids = implode(",",$order_ids);
-//     //     write_to_custom_log('ids to check: ' . $ids);
-//     //     if(!empty($order_ids))
-//     //         syncPriorityCompletedOrderIdStatus($order_ids);           
-//     // }
-//     //debug
-//     $order_ids = [120311,112542,120304,120967];
-//     syncPriorityCompletedOrderIdStatus($order_ids);  
-// }
 
 function write_to_custom_log($log_msg)
 {
@@ -142,11 +123,25 @@ function write_to_custom_log($log_msg)
         mkdir($log_filename, 0777, true);
     }
 
+    // Get all files in the log directory
+    $log_files = glob($log_filename . '/*.log');
+
+    // Define the time limit (files older than 7 days will be deleted)
+    $time_limit = strtotime('-7 days');
+
+    foreach ($log_files as $file) {
+        if (filemtime($file) < $time_limit) {
+            unlink($file); // Delete files older than 7 days
+        }
+    }
+
+        
     $log_file_data = $log_filename . '/' . date('d-M-Y') . '.log';
     // if you don't add `FILE_APPEND`, the file will be erased each time you add a log
     file_put_contents($log_file_data, date('H:i:s') . ' ' . $log_msg . "\n", FILE_APPEND);
 }
 
+//not in use
 function syncPriorityCompletedOrderIdStatus($order_ids){
     $conditions = [];
 
@@ -159,7 +154,7 @@ function syncPriorityCompletedOrderIdStatus($order_ids){
     $url_addition = 'ORDERS?$select=ORDNAME,BOOLCLOSED&$filter=(' . implode(' OR ', $conditions) . ')';
     $response = WooAPI::instance()->makeRequest("GET", $url_addition, [], true);
     if($response['code'] == '200'){
-        write_to_custom_log('success get orders id from priority');
+        //write_to_custom_log('success get orders id from priority');
         $priorirty_orders =json_decode($response['body_raw'], true)['value'];
         if(!empty($priorirty_orders)){
             $ord_names = [];
@@ -173,7 +168,7 @@ function syncPriorityCompletedOrderIdStatus($order_ids){
                 $doc_conditions[] = "ORDNAME eq '{$ord_name}'";
             }
             if(!empty($doc_conditions)){
-                $additionalurl = 'DOCUMENTS_D?$select=STCODE,STDES,DISTRDATE,AIRWAYBILL,STATDES,REFERENCE&$filter=(' . implode(' OR ', $doc_conditions) . ')';
+                $additionalurl = 'DOCUMENTS_D?$select=STCODE,STDES,DISTRDATE,AIRWAYBILL,STATDES,REFERENCE,DOCNO,TYPE&$filter=(' . implode(' OR ', $doc_conditions) . ')';
                 $response_doc = WooAPI::instance()->makeRequest( "GET", $additionalurl, [], true );
                 if($response_doc['code'] == '200'){
                     $doc_shippings     = json_decode( $response_doc['body'], true )['value'];
@@ -184,16 +179,16 @@ function syncPriorityCompletedOrderIdStatus($order_ids){
                             $unixTime = strtotime($data['DISTRDATE']);
                             $distrDate = date("d-m-Y", $unixTime);
                             $note = ' נשלח ב'.$data['STDES'].' בתאריך '.$distrDate;
-                            write_to_custom_log('update notes for '.$ord_name);
+                            //write_to_custom_log('update notes for '.$ord_name);
                             $order = wc_get_order($order_id);
                             if ( ! $order ) {
-                                write_to_custom_log($order_id.' is not a valid WooCommerce order.');
+                                //write_to_custom_log($order_id.' is not a valid WooCommerce order.');
                             }
                             else{
                                 $order->add_order_note( $note );
                                 $order->update_status( 'completed' );
                                 $order_status = get_order_status($order_id);
-                                write_to_custom_log($order_id.' has status: '.$order_status);
+                                //write_to_custom_log($order_id.' has status: '.$order_status);
                             }    
                         
                             
@@ -202,7 +197,7 @@ function syncPriorityCompletedOrderIdStatus($order_ids){
                     }  
                 }
                 else{
-                    write_to_custom_log('error get documents_d for'.$ord_name);
+                    //write_to_custom_log('error get documents_d for'.$ord_name);
                     WooAPI::instance()->sendEmailError(
                         get_bloginfo('admin_email'),
                         'Error Update Order from priority to website',
@@ -216,7 +211,7 @@ function syncPriorityCompletedOrderIdStatus($order_ids){
   
     }
     else{
-        write_to_custom_log('error get orders for'.$ord_name);
+        //write_to_custom_log('error get orders for'.$ord_name);
         WooAPI::instance()->sendEmailError(
             get_bloginfo('admin_email'),
             'Error get Order from priority to update status',
