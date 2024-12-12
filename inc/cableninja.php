@@ -580,13 +580,6 @@ function redirect($url) {
 };
 add_filter('simply_excel_reports', 'report_priority_quote_sixmonth');
 
-function simply_orders_excel_data_func($additionalurl) {
-    // Change $additionalurl to the sintax
-    $additionalurl = 'ORDERS?$filter=CURDATE ge '.$begindate.' and CURDATE le '.$todaydate.' and CUSTNAME eq \''.$priority_customer_number.'\' and ROYY_SHOWINWEB eq \'Y\'&$expand=ORDERITEMS_SUBFORM($select=PARTNAME,QUANT,PRICE,PDES,Y_9950_5_ESHB,ICODE,QPRICE,TUNITNAME,AROW_MITKABEL,SPEC14,TBALANCE)';
-    return $additionalurl;
-};
-add_filter('simply_orders_excel_data', 'simply_orders_excel_data_func');
-
 // Define a custom function to modify the value of $begindate
 function add_button_shopping_cart_func($value) {
     $currentDate = new DateTime();
