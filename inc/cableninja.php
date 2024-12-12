@@ -155,7 +155,7 @@ function CheckExistingProduct($product_sku, $item) {
     update_post_meta($id, '_backorders', 'yes');
 
     // Update ACF field Product attributes
-        $product_attributes = array(
+    $product_attributes = array(
         "0" => "12981",
         "1" => "12975",
         "2" => "12977",
@@ -205,7 +205,6 @@ function CheckExistingProduct($product_sku, $item) {
         update_field('customer_number', $priority_customer_number, $id);
         
     }
-
     
     // Add the category to the product
     wp_set_object_terms($id, 'מבצעי ממוספרים ללקוחות', 'product_cat', true);
@@ -229,8 +228,6 @@ function CheckExistingProduct($product_sku, $item) {
         'attributes' => $attributes,
         'show_in_web' => $item[$show_in_web]
     ];
-
-    // }
         
     foreach ($item['CPROFITEMS_SUBFORM'] as $product) {
                             
@@ -306,10 +303,20 @@ function CheckExistingProduct($product_sku, $item) {
                     // If it is, set the content to an empty string
                     $comment_without_specif = '';
                 }
-                /*if (trim(strip_tags($comment_without_specif)) === $wordToSearch) {
-                    // If it is, set the content to an empty string
-                    $comment_text = '';
-                }*/
+
+                // Remove empty HTML tags and non-breaking spaces
+                $clean_comment = preg_replace('/<[^>]+>(\s|&nbsp;)*<\/[^>]+>/', '', $comment_without_specif);
+
+                // Remove any remaining non-breaking spaces
+                $clean_comment = str_replace('&nbsp;', '', $clean_comment);
+
+                // Check if the comment is empty or contains only HTML tags
+                if (trim(strip_tags($clean_comment)) === '') {
+                    // Do not set the attribute if the content is empty
+                    $comment_without_specif = '';
+                } else {
+                    $comment_without_specif = $clean_comment;
+                }
             } else {
                 // If the word is not present, output the original text
                 $comment_without_specif =  $comment;
@@ -342,7 +349,7 @@ function CheckExistingProduct($product_sku, $item) {
             }
             $_attributes['pa_מצב-מלאי'] = $arow_instock;
 
-
+            $children_attributes = [];
             // Check if the attribute exists
             foreach ($_attributes as $attribute_name => $term_value){
                 $attribute = get_taxonomy($attribute_name);
@@ -434,12 +441,9 @@ function CheckExistingProduct($product_sku, $item) {
            
         // And finally (optionally if needed)
         wc_delete_product_transients( $product_id ); // Clear refresh the variation cache
-
-        // update_quantity_attribute_func( $product_id);
     } 
     
     return $quote_link;
- 
 };
 
 /**
@@ -449,8 +453,6 @@ function CheckExistingProduct($product_sku, $item) {
 add_action( 'wp_ajax_syncCPRofByNumber', 'syncCPRofByNumber' );
 add_action( 'wp_ajax_nopriv_syncCPRofByNumber', 'syncCPRofByNumber' );
 function syncCPRofByNumber($sku, $quote_token = null ) {
-    //  $quote_token = null) {
-
     if ($quote_token !== null) {      
         $quote_token = ' and ROYY_RAND eq \'' . $quote_token . '\'';
     } else {
@@ -477,8 +479,6 @@ function syncCPRofByNumber($sku, $quote_token = null ) {
     $url_addition = 'UDATE ge ' . $bod;
     $search_field = 'CPROFITEMS_SUBFORM($select=PARTNAME)'; //מקט של מוצר בן
     $data['expand'] = '&$expand=CPROFTEXT_SUBFORM,CPROFITEMS_SUBFORM($expand=CPROFITEMSTEXT_SUBFORM)';
-    // $quote_token = null;
-    // $quote_token =  ' and ROYY_RAND eq \'' . $quote_token . '\'';
     $url_addition_config = (!empty($config_v->additional_url) ? $config_v->additional_url : '');
     $filter = urlencode($url_addition) . ' ' . $url_addition_config;
     // get all CPRof from priority
@@ -486,21 +486,14 @@ function syncCPRofByNumber($sku, $quote_token = null ) {
     'CPROF?$filter=CPROFNUM eq \'' . $sku . '\'' . $quote_token . '&' . $filter . $data['expand']. '', [],
     WooAPI::instance()->option( 'log_items_priority', true ) );
 
-
-     // check response status
-     if ($response['status']) {
+    // check response status
+    if ($response['status']) {
         $response_data = json_decode($response['body_raw'], true);
         
         if ($response_data['value'][0] > 0) {
             foreach ($response_data['value'] as $item) {
                 $response = CheckExistingProduct($item['CPROFNUM'],  $item);    
-                
-                // if (CheckExistingProduct($item['CPROFNUM'],  $item)) {
-                //     continue; // Product already exists, skip to the next iteration
-                // }
-
             }
-
         } else {
             exit(json_encode(['status' => 0, 'msg' => 'Error Sync quotes Priority ']));
             $subj = 'check sync quote';
@@ -570,10 +563,7 @@ function custom_process_product_endpoint() {
         }
 
         redirect($link_quote);
-        // exit; // Make sure to exit after executing the code.       
     }
-    // return $link_p;
-
 }
 add_action( 'template_redirect', 'custom_process_product_endpoint', 1 );
 
@@ -588,95 +578,88 @@ function redirect($url) {
     $modified_begindate = date(DATE_ATOM, strtotime('-6 month'));
     return urlencode($modified_begindate);
 };
-
-// Hook into the filter used by the original plugin
 add_filter('simply_excel_reports', 'report_priority_quote_sixmonth');
+
+function simply_orders_excel_data_func($additionalurl) {
+    // Change $additionalurl to the sintax
+    $additionalurl = 'ORDERS?$filter=CURDATE ge '.$begindate.' and CURDATE le '.$todaydate.' and CUSTNAME eq \''.$priority_customer_number.'\' and ROYY_SHOWINWEB eq \'Y\'&$expand=ORDERITEMS_SUBFORM($select=PARTNAME,QUANT,PRICE,PDES,Y_9950_5_ESHB,ICODE,QPRICE,TUNITNAME,AROW_MITKABEL,SPEC14,TBALANCE)';
+    return $additionalurl;
+};
+add_filter('simply_orders_excel_data', 'simply_orders_excel_data_func');
 
 // Define a custom function to modify the value of $begindate
 function add_button_shopping_cart_func($value) {
-
     $currentDate = new DateTime();
     $data = $currentDate->format('Y-m-d');
-
     $expirationDate = new DateTime($value->EXPIRYDATE);
     $data2 = $expirationDate->format('Y-m-d');
 
-
-    if ($data < $data2) {
-        
+    if ($data < $data2) { 
         $add_button = "<td><button style='font-size: 13px!important;' data-num='".$value->CPROFNUM."' data-num='".$value->CPROFNUM."'type='button' class='btn_quote'>לרכישה
-        <div class='loader_wrap'>
-			<div class='loader_spinner'>
-				
-                <div class='line'></div>
-                <div class='line'></div>
-                <div class='line'></div>
-			</div>
-		</div>
+            <div class='loader_wrap'>
+                <div class='loader_spinner'>
+                    
+                    <div class='line'></div>
+                    <div class='line'></div>
+                    <div class='line'></div>
+                </div>
+            </div>
         </button></td>"; 
         return $add_button;
     }       
-
 };
-
-// Hook into the filter used by the original plugin
 add_filter('add_button_shopping_cart', 'add_button_shopping_cart_func');
 
-// function add_attache_priority_quote_func($values) {
-//     $manufacturer_sku = $values['value1'];
-//     $parent_id = $values['value2'];
+/*function add_attache_priority_quote_func($values) {
+    $manufacturer_sku = $values['value1'];
+    $parent_id = $values['value2'];
     
-//     $query_args = array(
-//         'post_type' => array( 'product', 'product_variation' ),
-//         'post_status' => 'publish',
-//         'meta_query' => array(
-//             '0' => array(
-//                 'key' => 'manufacturer_sku',
-//                 'value' =>  $manufacturer_sku,
-//                 'compare' => '=',
-//             ),
-//             '1' => array(
-//                 'key' => 'parent_id',
-//                 'value' => $parent_id,
-//                 'compare' => '=',
-//             ),
-//             'relation' => 'AND',
-//         ),
-//     );
+    $query_args = array(
+        'post_type' => array( 'product', 'product_variation' ),
+        'post_status' => 'publish',
+        'meta_query' => array(
+            '0' => array(
+                'key' => 'manufacturer_sku',
+                'value' =>  $manufacturer_sku,
+                'compare' => '=',
+            ),
+            '1' => array(
+                'key' => 'parent_id',
+                'value' => $parent_id,
+                'compare' => '=',
+            ),
+            'relation' => 'AND',
+        ),
+    );
     
-//     // The Query
-//     $the_query = new WP_Query( $query_args );
+    // The Query
+    $the_query = new WP_Query( $query_args );
     
-//     // The Loop
-//     if ( $the_query->have_posts() ) {
-//         while ( $the_query->have_posts() ) {
-//             $the_query->the_post();
-
-//             $product_url = get_permalink();
-
-//             //get the acf field 'link_array'
-//             $link = get_field('spec_link');
-//             if( !empty($link) ) { 
-//                 $link_url = $link['url'];
-//                 $link_title = $link['title'];
-//                 $link_target = $link['target'] ? $link['target'] : '_blank';
-//             }
-//         }
-//     }
-    
-//     if( !empty($link_url) ) {
-//         $attache = "<td style='white-space: normal!important;'><a href='".$link_url."' target='_blank' >
-//                             <img src='".get_stylesheet_directory_uri()."/assets/images/spec.svg' alt='Spec' style= 'width: 20px!important; max-width: 250%;'>
-//                             <span></span>
-//                     </a></td>";
-//     } 
-//     return $attache;
-// }
-
-// add_filter('add_attache_priority_quote', 'add_attache_priority_quote_func');
+    // The Loop
+    if ( $the_query->have_posts() ) {
+        while ( $the_query->have_posts() ) {
+            $the_query->the_post();
+            $product_url = get_permalink();
+            //get the acf field 'link_array'
+            $link = get_field('spec_link');
+            if( !empty($link) ) { 
+                $link_url = $link['url'];
+                $link_title = $link['title'];
+                $link_target = $link['target'] ? $link['target'] : '_blank';
+            }
+        }
+    }
+    if( !empty($link_url) ) {
+        $attache = "<td style='white-space: normal!important;'><a href='".$link_url."' target='_blank' >
+                            <img src='".get_stylesheet_directory_uri()."/assets/images/spec.svg' alt='Spec' style= 'width: 20px!important; max-width: 250%;'>
+                            <span></span>
+                    </a></td>";
+    } 
+    return $attache;
+}
+add_filter('add_attache_priority_quote', 'add_attache_priority_quote_func');*/
 
 function add_attache_priority_func($post_id) {
-    
     $query_args = array(
         'post_type' => array( 'product', 'product_variation' ),
         'post_status' => 'publish',
@@ -690,7 +673,6 @@ function add_attache_priority_func($post_id) {
     if ( $the_query->have_posts() ) {
         while ( $the_query->have_posts() ) {
             $the_query->the_post();
-
             //get the acf field 'link_array'
             $link = get_field('spec_link');
             /*if( !empty($link) ) { 
@@ -718,29 +700,26 @@ function add_attache_priority_func($post_id) {
     }
     return $attache;
 }
-
 add_filter('add_attache_priority', 'add_attache_priority_func');
 
-add_action('add_message_front_priorityQuotes', function(){?>
+add_action('add_message_front_priorityQuotes', function(){ ?>
     <p><?php echo 'ברירת המחדל להצגה היא חצי שנה אחורה. ניתן לעדכן מתאריך ועד תאריך ועל ידי כך להביא הצעות בטווח תאריכים שונה.'?></p>      
-<?php }); 
+<?php 
+}); 
 
-add_filter('add_attache_priority', 'add_attache_priority_func');
-
-add_action('add_message_front_priorityOrders', function(){?>
+add_action('add_message_front_priorityOrders', function(){ ?>
     <p><?php echo 'ברירת המחדל להצגה היא חצי שנה אחורה. ניתן לעדכן מתאריך ועד תאריך ועל ידי כך להביא הזמנות בטווח תאריכים שונה.'?></p>      
-<?php }); 
+<?php 
+}); 
 
 // search CUSTNAME by email or vat num, input is array user_id or  order object
 add_filter('simply_search_customer_in_priority','simply_search_customer_in_priority');
 function simply_search_customer_in_priority($data){  
     $order = $data['order'];
     $order_meta_data = $order->get_meta_data();
-
     $custname = WooAPI::instance()->option('walkin_number');
 
     foreach($order_meta_data as $meta) {
-
         // Access meta data values
         $meta_key = $meta->key;
         $meta_value = $meta->value;
@@ -756,13 +735,13 @@ function simply_search_customer_in_priority($data){
     $data['CUSTNAME'] = $custname;
     return $data;
 }
+
 add_filter('simply_modify_customer_number','simply_modify_customer_number');
 function simply_modify_customer_number($data){  
     $order = $data['order'];
     $order_meta_data = $order->get_meta_data();
 
     foreach($order_meta_data as $meta) {
-
         // Access meta data values
         $meta_key = $meta->key;
         $meta_value = $meta->value;
@@ -794,22 +773,6 @@ function simply_func($data)
         unset($data['CDES']);
     };
 
-    //update percent in header
-    // unset($data['PERCENT']);
-    // $config = json_decode(stripslashes(WooAPI::instance()->option('setting-config')));
-    // // $raw_option = str_replace(array('.', "\n", "\t", "\r"), '', $raw_option);
-    // // $config = json_decode(stripslashes($raw_option));
-    // $discount_type = (!empty($config->discount_type) ? $config->discount_type : 'additional_line');
-
-    // $cart_discount = floatval($order->get_total_discount());
-    // $cart_discount_tax = floatval($order->get_discount_tax());
-    // $order_total = floatval($order->get_subtotal());
-    // if ($order_total != 0)
-    //     $order_discount = ($cart_discount / $order_total) * 100.0;
-    // }
-    // if ('header' == $discount_type) {
-    //     $data['PERCENT'] = $order_discount;
-    // }
     $order_id = $data['orderId'];
     $order = wc_get_order($order_id);
     $details = $order->get_customer_note();
@@ -821,7 +784,6 @@ function simply_func($data)
     }
     $data['DETAILS'] = $limited_details;
     
-
     //sync  delivery codes for the order 
     $shipping_method = $order->get_shipping_methods();
     $shipping_method = array_shift($shipping_method);
@@ -843,11 +805,6 @@ function simply_func($data)
 
     $order_data_meta = $order->get_meta_data();
     foreach($order_data_meta as $meta) {
-
-        // Access meta data values
-        // $meta_key = $meta->key;
-        // $meta_value = $meta->value;
-
         if ($meta->key == '_purchase_order_number') {
             $reference = $meta->value;
             if(!empty($reference)) {
@@ -862,12 +819,12 @@ function simply_func($data)
             }
         }
     }
+    $data['ORDSTATUSDES'] = "חדש מהפורטל";
 
     return $data;
 }
 
 add_filter('simply_modify_orderitem', 'my_custom_orderitem_modifier');
-
 function my_custom_orderitem_modifier($args) {
     // Access the data and item from the filter
     $data = $args['data'];
@@ -884,39 +841,84 @@ function my_custom_orderitem_modifier($args) {
         $data['ORDERITEMS_SUBFORM'][sizeof($data['ORDERITEMS_SUBFORM']) - 1]['BARCODE'] = $barcode;
             
         $field = get_field('parent_id' ,$product_id);
- 		if (!(substr($field, 0, 2) === "PQ")) {  
-
+        if (!(substr($field, 0, 2) === "PQ")) {  
+            //update quant
             unset($data['ORDERITEMS_SUBFORM'][sizeof($data['ORDERITEMS_SUBFORM']) - 1]['TQUANT']);
-            // unset($data['ORDERITEMS_SUBFORM'][sizeof($data['ORDERITEMS_SUBFORM']) - 1]['PRICE']); 
 
+            $popup_type = $item->get_meta( 'Popup Type' );
+            if ($popup_type === 'length') {
+                $popup_unit = (int)$item->get_meta( 'Popup Unit' );
+                $price_subtoatl = (float)$item->get_subtotal();
+                $price_unit = $price_subtoatl / $popup_unit;
+
+                $data['ORDERITEMS_SUBFORM'][sizeof($data['ORDERITEMS_SUBFORM']) - 1]['TQUANT'] = $popup_unit;
+                $data['ORDERITEMS_SUBFORM'][sizeof($data['ORDERITEMS_SUBFORM']) - 1]['PRICE'] = $price_unit;    
+            }
+            elseif ($popup_type === 'piece') {
+                $popup_qty = (int)$item->get_meta( 'Popup Qty' );
+                $price_subtoatl = (float)$item->get_subtotal();
+                $price_unit = $price_subtoatl / $popup_qty;
+
+                $data['ORDERITEMS_SUBFORM'][sizeof($data['ORDERITEMS_SUBFORM']) - 1]['TQUANT'] = $popup_qty;
+                $data['ORDERITEMS_SUBFORM'][sizeof($data['ORDERITEMS_SUBFORM']) - 1]['PRICE'] = $price_unit; 
+
+            } else {
+                $attribute_name = 'pa_אורך'; 
+                // Get the product attribute value (term) for the specified attribute
+                $attribute_value = (int)$product->get_attribute($attribute_name);
+                if (!empty ($attribute_value)) {
+                    $quant = (int)$item->get_quantity();
+                    $tquant = $attribute_value * $quant;
+                    $regular_price = (float)$product->get_regular_price();
+                    $sale_price = (float)$product->get_sale_price();
+                    $price = ($sale_price && $sale_price > 0) ? $sale_price : $regular_price;                  
+                    $price_unit = $price / $attribute_value;
+
+    
+                    $data['ORDERITEMS_SUBFORM'][sizeof($data['ORDERITEMS_SUBFORM']) - 1]['TQUANT'] = $tquant;
+                    $data['ORDERITEMS_SUBFORM'][sizeof($data['ORDERITEMS_SUBFORM']) - 1]['PRICE'] = $price_unit;
+
+                }  
+                else {
+                    $attribute_name = 'pa_כמות-בחבילה';
+                    $attribute_value = (int)$product->get_attribute($attribute_name);
+                    if (!empty ($attribute_value)) {
+                        $quant = (int)$item->get_quantity();
+                        $tquant = $attribute_value * $quant;
+                        $regular_price = (float)$product->get_regular_price();
+                        $sale_price = (float)$product->get_sale_price();
+                        $price = ($sale_price && $sale_price > 0) ? $sale_price : $regular_price; 
+                        $price_unit = $price / $attribute_value;
+
+                        $data['ORDERITEMS_SUBFORM'][sizeof($data['ORDERITEMS_SUBFORM']) - 1]['TQUANT'] = $tquant;
+                        $data['ORDERITEMS_SUBFORM'][sizeof($data['ORDERITEMS_SUBFORM']) - 1]['PRICE'] = $price_unit;
+
+                    }
+                }
+            }
+
+            /*//update price
             $attribute_name = 'pa_אורך'; 
             // Get the product attribute value (term) for the specified attribute
             $attribute_value = (int)$product->get_attribute($attribute_name);
             if (!empty ($attribute_value)) {
-                $quant = (int)$item->get_quantity();
-                $tquant = $attribute_value * $quant;
-                $data['ORDERITEMS_SUBFORM'][sizeof($data['ORDERITEMS_SUBFORM']) - 1]['TQUANT'] = $tquant;
-    
                 $regular_price = (float)$product->get_regular_price();
-                $Price_unit = $regular_price / $attribute_value;
-                $data['ORDERITEMS_SUBFORM'][sizeof($data['ORDERITEMS_SUBFORM']) - 1]['PRICE'] = $Price_unit;
+                $price_unit = $regular_price / $attribute_value;
+                $data['ORDERITEMS_SUBFORM'][sizeof($data['ORDERITEMS_SUBFORM']) - 1]['PRICE'] = $price_unit;
     
             }  
             else {
                 $attribute_name = 'pa_כמות-בחבילה';
                 $attribute_value = (int)$product->get_attribute($attribute_name);
                 if (!empty ($attribute_value)) {
-                    $quant = (int)$item->get_quantity();
-                    $tquant = $attribute_value * $quant;
-                    $data['ORDERITEMS_SUBFORM'][sizeof($data['ORDERITEMS_SUBFORM']) - 1]['TQUANT'] = $tquant;
-        
                     $regular_price = (float)$product->get_regular_price();
-                    $Price_unit = $regular_price / $attribute_value;
-                    $data['ORDERITEMS_SUBFORM'][sizeof($data['ORDERITEMS_SUBFORM']) - 1]['PRICE'] = $Price_unit;
+                    $price_unit = $regular_price / $attribute_value;
+                    $data['ORDERITEMS_SUBFORM'][sizeof($data['ORDERITEMS_SUBFORM']) - 1]['PRICE'] = $price_unit;
                 }
-            } 
-            $instock = $product->get_stock_status();
-            if ($instock == 'instock') {
+            }*/
+ 
+            $eta_stock = $item->get_meta( 'ETA' );
+            if ($eta_stock === "" || $eta_stock === "In Stock") {
                 $data['ORDERITEMS_SUBFORM'][sizeof($data['ORDERITEMS_SUBFORM']) - 1]['AROW_INSTOCK'] ='Y';
                 $data['ORDERITEMS_SUBFORM'][sizeof($data['ORDERITEMS_SUBFORM']) - 1]['AROW_BYSEA'] ='null';
                 $data['ORDERITEMS_SUBFORM'][sizeof($data['ORDERITEMS_SUBFORM']) - 1]['AROW_BYAIR'] ='null';
@@ -966,6 +968,16 @@ function my_custom_orderitem_modifier($args) {
             } 
 
         }
+
+        if ($data['ORDERITEMS_SUBFORM'][sizeof($data['ORDERITEMS_SUBFORM']) - 1]['AROW_INSTOCK'] == 'Y' ) {
+            $data['ORDERITEMS_SUBFORM'][sizeof($data['ORDERITEMS_SUBFORM']) - 1]['AROW_MITKABEL'] = date('Y-m-d', strtotime('+3 days'));
+        }
+        elseif ($data['ORDERITEMS_SUBFORM'][sizeof($data['ORDERITEMS_SUBFORM']) - 1]['AROW_BYAIR'] == 'Y' ) {
+            $data['ORDERITEMS_SUBFORM'][sizeof($data['ORDERITEMS_SUBFORM']) - 1]['AROW_MITKABEL'] = date('Y-m-d', strtotime('+10 days'));
+        }
+        elseif ($data['ORDERITEMS_SUBFORM'][sizeof($data['ORDERITEMS_SUBFORM']) - 1]['AROW_BYSEA'] == 'Y' ) {
+            $data['ORDERITEMS_SUBFORM'][sizeof($data['ORDERITEMS_SUBFORM']) - 1]['AROW_MITKABEL'] = date('Y-m-d', strtotime('+30 days'));
+        }
     }
     // Get the product meta data
     $product_meta_data = $item->get_meta_data();
@@ -989,12 +1001,10 @@ function my_custom_orderitem_modifier($args) {
             $meta_eta = $meta->value;
             $data['ORDERITEMS_SUBFORM'][sizeof($data['ORDERITEMS_SUBFORM']) - 1]['AROW_SOURCE'] = $meta_eta;
         }
-
     }
     // Return the modified data
     return ['data' => $data, 'item' => $item];
 }
-
 
 add_filter('simply_syncCustomer', 'simply_syncCustomer_func');
 function simply_syncCustomer_func($request)
@@ -1005,8 +1015,6 @@ function simply_syncCustomer_func($request)
 
 function update_status_cprofnum($cprofnum)
 {
-    ///https://arrowcables.wee.co.il/odata/Priority/tabula.ini/chcpkd/CPROF?$filter=CPROFNUM eq 'PQ24001651'
-
     $cprofnum = $cprofnum;
     $data = ['STATDES' => "הוזמן מהחנות"];
 
@@ -1017,5 +1025,334 @@ function update_status_cprofnum($cprofnum)
         $response_data = json_decode($response['body_raw'], true);
         // updte_post_meta($cprof_id'cprof_status', 'הוזמן מהחנות');
     }
+}
 
+/**
+ * sync inventory from priority
+ */
+
+function syncInventoryPriority()
+{
+    // get the items simply by time stamp of today
+    $daysback_options = explode(',', WooAPI::instance()->option('sync_inventory_warhsname'))[0];
+    $daysback = intval(!empty($daysback_options) ? $daysback_options : 1); // change days back to get inventory of prev days
+    $stamp = mktime(1 - ($daysback * 24), 0, 0);
+    $bod = date(DATE_ATOM, $stamp);
+    $url_addition = '('. rawurlencode('WARHSTRANSDATE ge ' . $bod . ' or PURTRANSDATE ge ' . $bod . ' or SALETRANSDATE ge ' . $bod . ' or YAEL_DATEUPDORDERS ge ' . $bod . ' or YAEL_DATEUPDPORDERS ge ' . $bod) . ')';
+    $wh_name = explode(',', WooAPI::instance()->option('sync_inventory_warhsname'))[0];
+ 
+    $expand = '$expand=LOGCOUNTERS_SUBFORM($expand=PARTAVAIL_SUBFORM($select=AROW_DUEDATE,TQUANT,TITLE))';
+    
+    $response = WooAPI::instance()->makeRequest('GET', 'LOGPART?$select=BARCODE,PARTNAME,YAEL_PLEADTIME,BASEPLPRICE&$filter=SPEC14 ne \'\' and '.$url_addition.' and INVFLAG eq \'Y\' &' . $expand, [], 
+                WooAPI::instance()->option('log_inventory_priority', false));
+
+    // check response status
+    if ($response['status']) {
+        $data = json_decode($response['body_raw'], true);
+        foreach ($data['value'] as $item) {
+            // if product exsits, update
+            $args = array(
+                'post_type' => array('product', 'product_variation'),
+                'meta_query' => array(
+                    'relation' => 'AND',
+                    array(
+                        'key' => 'manufacturer_sku',
+                        'value' => $item['BARCODE'],
+                        'compare' => '='
+                    ),
+                    array(
+                        'key' => '_sku',
+                        'value' => '',
+                        'compare' => '!=' 
+                    )
+                )
+            );
+            $my_query = new \WP_Query($args);
+            if ($my_query->have_posts()) {
+                while ($my_query->have_posts()) {
+                    $my_query->the_post();
+                    $product_id = get_the_ID();           
+                    $parent_id = get_field('parent_id' ,$product_id);
+                    if (!empty($parent_id) && !(substr($parent_id, 0, 2) === "PQ")) {
+                        // get the stock by part availability
+                        $stock = $item['LOGCOUNTERS_SUBFORM'][0]['BALANCE'];
+                        $delivery_days = $item['YAEL_PLEADTIME'];
+                        $is_orders =  $item['LOGCOUNTERS_SUBFORM'][0]['ORDERS'];
+                        
+                        foreach($item['LOGCOUNTERS_SUBFORM'][0]['PARTAVAIL_SUBFORM'] as $line_available) {
+                            $type_transaction = $line_available['TITLE'];
+                            if($type_transaction == 'הזמנות רכש'){
+                                if(!empty($line_available['AROW_DUEDATE'])) {
+                                    //check that the required date is within 2 days of today
+                                    $today = new DateTime();
+                                    $date_time = new DateTime($line_available['AROW_DUEDATE']);
+                                    $due_date = $date_time->format('d.m.Y');
+                                    $due_date = DateTime::createFromFormat('d.m.Y', $due_date);
+                                    if ($due_date !== false) {
+                                        $interval = $today->diff($due_date)->days;
+                                        if ($interval <= 2 ) {
+                                            $stock += $line_available['TQUANT'];
+                                        }
+                                        else {
+                                            continue;
+                                        }
+                                    }
+                                } 
+                                else {
+                                    //required date field is empty
+                                    $stock += $line_available['TQUANT'];
+                                }
+                                continue;
+                            }
+
+                            if($type_transaction == 'הזמנות לקוח'){
+                                if($delivery_days !== 0) {
+                                    $today = new DateTime();
+                                    $date_time = new DateTime($line_available['AROW_DUEDATE']);
+                                    $due_date = $date_time->format('d.m.Y');
+                                    $due_date = DateTime::createFromFormat('d.m.Y', $due_date);
+                                    $delivery_date = date('d.m.Y', strtotime("+$delivery_days days"));
+                                    $delivery_date = DateTime::createFromFormat('d.m.Y', $delivery_date);
+
+                                    if ($due_date !== false && $delivery_date !== false) {
+                                        $interval = $today->diff($due_date)->days;
+                                        $interval_delivery = $today->diff($delivery_date)->days;
+
+                                        if ($interval <= $interval_delivery ) {
+                                            $stock = $stock += $line_available['TQUANT'];
+                                        }
+                                        else {
+                                            continue;
+                                        }
+                                    }
+
+                                }
+                                else {
+                                    $today = new DateTime();
+                                    $date_time = new DateTime($line_available['AROW_DUEDATE']);
+                                    $due_date = $date_time->format('d.m.Y');
+                                    $due_date = DateTime::createFromFormat('d.m.Y', $due_date);
+
+                                    if ($due_date !== false) {
+                                        $interval = $today->diff($due_date)->days;
+
+                                        if ($interval <= 30 ) {
+                                            $stock = $stock += $line_available['TQUANT'];
+                                        }
+                                        else {
+                                            continue;
+                                        }
+                                    }
+                                }
+                                continue;
+                            }
+                        }
+                        update_post_meta($product_id, '_stock', $stock);
+                        update_post_meta($product_id, '_procurement_time', $delivery_days);
+
+                        $expected_stock = 0;
+                        $expected_stock_2 = 0;
+                        $expected_stock_3 = 0;
+                        $today = new DateTime();
+                        foreach($item['LOGCOUNTERS_SUBFORM'][0]['PARTAVAIL_SUBFORM'] as $line_available) {                          
+                            if ($line_available['TITLE'] !== 'הזמנות רכש') {
+                                continue;
+                            }
+                                
+                            $date_time = new DateTime($line_available['AROW_DUEDATE']);
+                            $due_date = $date_time->format('d.m.Y');
+                            $due_date = DateTime::createFromFormat('d.m.Y', $due_date);
+
+                            if ($due_date === false) {
+                                continue;
+                            }
+
+                            $interval = $today->diff($due_date)->days;
+                            $tquant = $line_available['TQUANT'];
+                            if ($interval >= 3 &&  $interval <= 10) {
+                                if ( $expected_stock == 0 ) {
+                                    $expected_stock = $stock + $tquant;
+                                } else {
+                                    $expected_stock += $tquant;
+                                }
+                            } elseif ($interval >= 11 &&  $interval <= 20) {
+                                if ( $expected_stock_2 == 0 ) {
+                                    $expected_stock_2 =  ($expected_stock == 0) 
+                                        ? $stock + $expected_stock + $tquant 
+                                        : $expected_stock + $tquant;  
+                                }
+                                else{
+                                    $expected_stock_2 += $tquant;
+                                }                                        
+                            } elseif ($interval >= 21 &&  $interval <= 30) {
+                                if ( $expected_stock_3 == 0 ) {
+                                    $expected_stock_3 = ($expected_stock_2 == 0) 
+                                    ? (
+                                        ($expected_stock == 0) 
+                                        ? $stock + $expected_stock + $expected_stock_2 + $tquant 
+                                        : $expected_stock + $expected_stock_2 + $tquant
+                                    ) 
+                                    : $expected_stock_2 + $tquant;
+                                } else {
+                                    $expected_stock_3 += $tquant;
+                                }
+                            } else {
+                                continue;
+                            }                         
+                        }
+                        update_post_meta($product_id, '_stock_expected_10_days', ($expected_stock == 0 ) ? $expected_stock = $stock : $expected_stock);
+                        update_post_meta($product_id, '_stock_expected_20_days', ($expected_stock_2 == 0 ) ? $expected_stock_2 = $expected_stock : $expected_stock_2);
+                        update_post_meta($product_id, '_stock_expected_30_days', ($expected_stock_3 == 0 ) ? $expected_stock_3 = $expected_stock_2 : $expected_stock_3);
+
+                        // sync price from priority to product
+                        /*$_product = wc_get_product( $product_id );
+                        if ( $_product->is_type( 'simple' ) ) {
+                            $price = $item['BASEPLPRICE'];
+                            update_post_meta($product_id, '_regular_price', $price);
+                        }*/
+                        
+                        /*// set stock status
+                        if (intval($stock) > 0) {
+                            // update_post_meta($product_id, '_stock_status', 'instock');
+                            $stock_status = 'instock';
+                        } else {
+                            // update_post_meta($product_id, '_stock_status', 'outofstock');
+                            $stock_status = 'outofstock';
+                        }*/
+                    }
+                }
+            } else {
+                $product_id = 0;
+            }
+        }
+
+        // add timestamp
+        WooAPI::instance()->updateOption('inventory_priority_update', time());
+    } else {
+        WooAPI::instance()->sendEmailError(
+            WooAPI::instance()->option('email_error_sync_inventory_priority'),
+            'Error Sync Inventory Priority',
+            $response['body']
+        );
+    }
+}
+add_action('syncInventoryPriority_hook', 'syncInventoryPriority');
+
+if (!wp_next_scheduled('syncInventoryPriority_hook')) {
+    $res = wp_schedule_event(time(), 'daily', 'syncInventoryPriority_hook');
+}
+
+add_filter('simply_accounts_receivable_table', function( $priority_customer_number ) {
+
+    $additionalurl = 'ACCOUNTS_RECEIVABLE?$select=ACCNAME,BALANCE3&$expand=ARFNCITEMS3_SUBFORM($select=BALDATE,FNCDATE,ORDNAME,IVNUM,DETAILS,SUMDEBIT,SUMCREDIT,BAL)&$filter=ACCNAME eq \'' . $priority_customer_number . '\'';
+    $args = [];
+    $response = WooAPI::instance()->makeRequest("GET", $additionalurl, $args, true);
+    $data = json_decode($response['body']);
+
+    if (!empty($data->value)) {
+        echo "<table> <tr>";
+        echo "<th></th><th>" . esc_html__('BALDATE', 'p18w') . "</th> <th>" . esc_html__('FNCDATE', 'p18w') . "</th> <th>" . esc_html__('ORDNUM', 'p18w') . "</th> <th>" . esc_html__('IVNUM', 'p18w') . "</th> <th>" . esc_html__('DETAILS', 'p18w') . "</th> <th>" . esc_html__('DEBTBAL', 'p18w') . "</th> <th>" . esc_html__('RIGHTBAL', 'p18w') . "</th> <th>" . esc_html__('BALANCE', 'p18w') . "</th><th></th>";
+        echo "</tr>";
+        global $woocommerce;
+        $items = $woocommerce->cart->get_cart();
+        $retrive_data = WC()->session->get('session_vars');
+        $retrieve_ivnum = WC()->session->get('pdt_ivnum');
+
+        $pdts_in_cart = array();
+        if (!empty($retrive_data['ordertype'])) {
+            foreach (WC()->cart->get_cart() as $cart_item_key => $cart_item) {
+                $pdts_in_cart[] = $cart_item['_other_options']['product-ivnum'];
+            }
+        }
+
+        $i = 1;  
+        $todayDate = new DateTime(); 
+        foreach ($data->value[0]->ARFNCITEMS3_SUBFORM as $key => $value) {
+            //Checking whether the date has passed
+            $fncDate = new DateTime($value->FNCDATE);
+            $red = ($todayDate > $fncDate) ? 'red' : ''; 
+                
+            echo "<tr class='pass_date " . $red . "'>";
+
+            //check if already pay for this ivnum
+            $disabled = '';
+            if (!empty($retrieve_ivnum)) {
+                if (in_array($value->IVNUM, $retrieve_ivnum)) {
+                    $disabled = 'disabled="disabled"';
+                } else {
+                    // $disabled = '';
+                }
+            }
+            if (!empty($pdts_in_cart)) {
+                if (in_array($value->IVNUM, $pdts_in_cart)) {
+                    $checked = 'checked';
+                } else {
+                    $checked = '';
+                }
+            }
+            $date = $value->BALDATE;
+            $createDate = new DateTime($date);
+            $strip = $createDate->format('d/m/y');
+
+            if (!isset($checked)) {
+                $checked = '';
+            }
+            echo '<td><input type="checkbox" ' . $checked . ' ' . $disabled . ' name="' . $value->SUMDEBIT . '#' . $value->IVNUM . '#' . $strip . '#' . $value->DETAILS . '" class="obligo_checkbox" data-sum=' . $value->SUMDEBIT . ' data-IVNUM=' . $value->IVNUM . ' value="obligo_chk_sum' . $i . '"></td>';
+            
+            // Create the array object in a new order
+            $order = ['BALDATE', 'FNCDATE', 'ORDNAME', 'IVNUM', 'DETAILS', 'SUMDEBIT', 'SUMCREDIT', 'BAL'];
+            $sortedValue = new stdClass();
+            foreach ($order as $key) {
+                $sortedValue->$key = property_exists($value, $key) ? $value->$key : null;
+            }
+
+            foreach ($sortedValue as $Fkey => $Fvalue) {
+                if ($Fkey == 'BALDATE' || $Fkey == 'FNCDATE' || $Fkey == 'ORDNAME' || $Fkey == 'IVNUM' || $Fkey == 'DETAILS' || $Fkey == 'SUMDEBIT' || $Fkey == 'SUMCREDIT' || $Fkey == 'BAL') {
+                    if ($Fkey == 'BALDATE') {
+                        $timestamp = strtotime($Fvalue);
+                        echo "<td>" . date('d/m/y', $timestamp) . "</td>";
+                    } elseif ($Fkey == 'FNCDATE') {
+                        $timestampFnc = strtotime($Fvalue);
+                        echo "<td>" . date('d/m/y', $timestampFnc) . "</td>";
+                    } else {
+                        if ( $Fkey == 'SUMDEBIT' || $Fkey == 'SUMCREDIT' || $Fkey == 'BAL' )
+                            $Fvalue = number_format($Fvalue, 2, '.', ',') . ' ש"ח';
+                        echo "<td>" . $Fvalue . "</td>";
+                    }
+                }
+            }
+            echo "<td>
+                    <button style='font-size: 13px!important;' type='button' class='open_doc btn_open_ivnum' data-ivnum='" . htmlspecialchars($value->IVNUM, ENT_QUOTES, 'UTF-8') . "'>" 
+                        . __('Presentation of the invoice', 'p18w') . "
+                        <div class='loader_wrap'>
+                            <div class='loader_spinner'>
+                                <div class='line'></div>
+                                <div class='line'></div>
+                                <div class='line'></div>
+                            </div>
+                        </div>
+                    </button>
+                </td>";
+            echo "</tr>";
+            $i++;
+        }
+        echo "</table>";
+
+        echo "</form>";
+    }
+    return true;
+});
+
+//change translation from p18w
+add_filter('gettext', 'change_priority_plugin_translation', 20, 3);
+function change_priority_plugin_translation($translated_text, $text, $domain) {
+    // Check if the domain is 'p18w' and the text matches
+    if ($domain === 'p18w') {
+        switch ($text) {
+            case 'Obligo':
+                $translated_text = 'חובות פתוחים'; // Replace with your desired text
+                break;
+        }
+    }
+    return $translated_text;
 }
