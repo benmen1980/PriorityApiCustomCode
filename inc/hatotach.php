@@ -115,8 +115,6 @@ add_action('simply_update_product_data', function($item){
 
 });
 
-
-
 /**
  * sync inventory from priority
  * Inventory sync once a day without a filter in "days_back" of several days back
@@ -208,3 +206,77 @@ add_action('syncInventoryPriority_hook', 'syncInventoryPriority');
 if (!wp_next_scheduled('syncInventoryPriority_hook')) {
     $res = wp_schedule_event(time(), 'daily', 'syncInventoryPriority_hook');
 }
+
+//Inventory update according to available web inventory
+add_filter('simply_sync_inventory_priority', 'simply_sync_inventory_priority_func');
+function simply_sync_inventory_priority_func($item)
+{
+    $item['stock'] = $item['LOGCOUNTERS_SUBFORM'][0]['SAPL_BALANCE'];
+    return $item;
+}
+
+
+/*
+קוד לסגירת חקבלה כבר בשידור בפניה ל hub2node,
+זה לא עלה כי עדיין יש בעיה בתקשורת לפריוריטי, 
+בטיפול של רועי
+add_filter('simply_after_post_receipt', 'simply_after_receipt_func');
+function simply_after_receipt_func($array)
+{
+    // $ord_status = $array["STATDES"];
+    $ord_number = $array["IVNUM"]; 
+
+    $username = WooAPI::instance()->option('username');
+    $password = WooAPI::instance()->option('password');
+    $url = 'https://'.WooAPI::instance()->option('url');
+    if( false !== strpos( $url, 'p.priority-connect.online' ) ) {
+        $url = 'https://p.priority-connect.online/wcf/service.svc';
+    }
+    $tabulaini = WooAPI::instance()->option('application');
+    $company = WooAPI::instance()->option('environment');
+    $appid = WooAPI::instance()->option('X-App-Id');
+    $appkey = WooAPI::instance()->option('X-App-Key');
+
+    $data['IVNUM'] = $ord_number;
+    $data['credentials']['appname'] = 'demo';
+    $data['credentials']['username'] = $username;
+    $data['credentials']['password'] = $password;
+    $data['credentials']['url'] = $url;
+    $data['credentials']['tabulaini'] = $tabulaini;
+    $data['credentials']['language'] = '1';
+    $data['credentials']['profile']['company'] = $company;
+    $data['credentials']['devicename'] = 'roy';
+    $data['credentials']['appid'] = $appid;
+    $data['credentials']['appkey'] = $appkey;
+
+    $curl = curl_init();
+    curl_setopt_array($curl, 
+        array(
+            CURLOPT_URL => 'http://prinodehub1-env.eba-gdu3xtku.us-west-2.elasticbeanstalk.com/closeTinvoices',
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_ENCODING => '',
+            CURLOPT_MAXREDIRS => 10,
+            CURLOPT_TIMEOUT => 0,
+            CURLOPT_FOLLOWLOCATION => true,
+            CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
+            CURLOPT_CUSTOMREQUEST => 'POST',
+            CURLOPT_POSTFIELDS => json_encode($data),
+            CURLOPT_HTTPHEADER => array(
+                'Content-Type: application/json'
+        ),
+    ));
+
+    $response = curl_exec($curl);
+    if ($response['status']) {
+        $response_data = json_decode($response['body_raw'], true);
+    };
+
+    $array['IVNUM'] = $response_data['value']; 
+    $array['STATDES'] = $response_data['value']; 
+
+    curl_close($curl);
+
+    return $array;
+
+
+}*/
