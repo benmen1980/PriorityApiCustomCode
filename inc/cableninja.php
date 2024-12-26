@@ -1033,8 +1033,8 @@ add_action('simply_open_quote_request', function($quotemun) {
             $date = date( 'd/m/y',strtotime($quote['PDATE']));
             $price = $quote['TOTPRICE'];
         }
-    // $to = 'info@arrowcables.com';
-        $to = 'margalit.t@simplyct.co.il';
+        $to = 'info@arrowcables.com';
+        // $to = 'margalit.t@simplyct.co.il';
         $subject = 'לקוח  ' . $company . ' נכנס להצעת מחיר ' . $quotemun . ' באזור האישי';
         $message = '<div style="direction: rtl;">היי, 
                     <br/> תאריך הצעה: ' . $date . '
