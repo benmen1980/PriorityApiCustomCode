@@ -1020,6 +1020,33 @@ function update_status_cprofnum($cprofnum)
     }
 }
 
+// Send email in open the quote
+add_action('simply_open_quote_request', function($quotemun) {   
+    $response = WooAPI::instance()->makeRequest('GET',
+    'CPROF?$filter=CPROFNUM eq \'' . $quotemun . '\' ', [], true );
+
+    if ($response['status']) {
+        $response_data = json_decode($response['body_raw'], true);
+        foreach($response_data['value'] as $quote) {
+            $company = $quote['CDES'];
+            $contact = $quote['NAME'];
+            $date = date( 'd/m/y',strtotime($quote['PDATE']));
+            $price = $quote['TOTPRICE'];
+        }
+    // $to = 'info@arrowcables.com';
+        $to = 'margalit.t@simplyct.co.il';
+        $subject = 'לקוח  ' . $company . ' נכנס להצעת מחיר ' . $quotemun . ' באזור האישי';
+        $message = '<div style="direction: rtl;">היי, 
+                    <br/> תאריך הצעה: ' . $date . '
+                    <br/> סך המחיר: ' . $price . '
+                    <br/> איש קשר: ' . $contact . '. </div>';
+        $headers = array('Content-Type: text/html; charset=UTF-8');
+
+        // Send email
+        $result = wp_mail($to, $subject, $message, $headers); 
+    }
+});
+
 /**
  * sync inventory from priority
  */
