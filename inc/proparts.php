@@ -59,23 +59,29 @@ function simply_func($data)
 
 add_filter('change_design_pricelist_qty_table', 'design_pricelist_qty_table');
 function design_pricelist_qty_table($data) {
-    ?>
-    <table style="width:100%!important" class="simply-tire-price-grid">
-        <tbody id="simply-tire-price-grid-rows">
-        <?php
-        foreach ($data as $item) {
-            $price = $item["price_list_price"];
-            $float_price = $price;
-            $quantity = $item["price_list_quant"];
-            $price_discount = $item["price_list_disprice"];
-            $percent = $item["price_list_percent"];
+    if ( is_user_logged_in() ) {
+        $user_id = get_current_user_id();
+        $priority_number = get_user_meta($user_id, 'priority_customer_number', true);
+        if (!empty($priority_number) ||  $priority_number !== 'C22222') {
             ?>
-            <tr class="price_list_tr" >
-                <td class="price_list_td"> <?php echo 'קנה <span class="simply-tire-quantity">' . $quantity . '</span> יחידות ב <strong class="simply-tire-price">₪<span class="simply-tire-price-float simply-tire-price-number">' . $price_discount. '</span></strong> ליחידה (כולל מע"מ) וחסוך ' . $percent . '%'?> </td>
-            </tr>
-            <?php
+            <table style="width:100%!important" class="simply-tire-price-grid">
+                <tbody id="simply-tire-price-grid-rows">
+                <?php
+                foreach ($data as $item) {
+                    $price = $item["price_list_price"];
+                    $float_price = $price;
+                    $quantity = $item["price_list_quant"];
+                    $price_discount = $item["price_list_disprice"];
+                    $percent = $item["price_list_percent"];
+                    ?>
+                    <tr class="price_list_tr" >
+                        <td class="price_list_td"> <?php echo 'קנה <span class="simply-tire-quantity">' . $quantity . '</span> יחידות ב <strong class="simply-tire-price">₪<span class="simply-tire-price-float simply-tire-price-number">' . $price_discount. '</span></strong> ליחידה (כולל מע"מ) וחסוך ' . $percent . '%'?> </td>
+                    </tr>
+                    <?php
+                }
+                ?></tbody>
+            </table>
+        <?php
         }
-        ?></tbody>
-    </table>
-    <?php
+    } 
 }

@@ -13,23 +13,27 @@
     add_filter('simply_syncItemsPriority_data', 'simply_syncItemsPriority_data_func');
     function simply_syncItemsPriority_data_func($data)
     {
-        $data['select'] .= ',SUPDES';
+        $data['select'] .= ',SUPDES,SPEC16';
         return $data;
     }
 
-    add_filter('simply_modify_long_text', 'simply_modify_long_text_func');
-    function simply_modify_long_text_func($data)
+    add_filter('simply_modify_product_variable', 'simply_modify_product_variable_func');
+    function simply_modify_product_variable_func($data)
     {
 
-        $response = WooAPI::instance()->makeRequest('GET', 'LOGPART(\'' . $data['sku'] . '\')?$select=PARTNAME&$expand=PARTTEXT_SUBFORM',
+        $response = WooAPI::instance()->makeRequest('GET', 'LOGPART(\'' . $data['sku'] . '\')?$select=PARTNAME,SPEC20,SPEC7,SPEC16&$expand=PARTTEXT_SUBFORM',
             [], true);
         $response_data = json_decode($response['body_raw'], true);
 
         if (isset($response_data['PARTTEXT_SUBFORM'])) {
             foreach ($response_data['PARTTEXT_SUBFORM'] as $text) {
-                $data['text'] .= $text;
+                $clean_text = preg_replace('/<style>.*?<\/style>/s', '', $text);
+                $data['text'] .= $clean_text;
             }
         }
+        $data['show_in_web'] = $response_data['SPEC20'];
+        $data['shipping'] = $response_data['SPEC7'];
+        $data['menu_order'] = $response_data['SPEC16'];
         return $data;
     }
     
@@ -50,6 +54,20 @@
     }
     add_action('simply_update_product_data',function($item){
         simply_set_ship_class($item['product_id'],$item['SPEC7']);
+        // Update the menu_order meta field for the product
+        update_post_meta($item['product_id'], '_menu_order', $item['SPEC16']);
+
+        // Update the product inventory - instock 
+        $product = wc_get_product($item['product_id']);
+        $product->set_stock_status('outofstock');
+        // Save the data and refresh caches
+        $product->save();
+		
+		$product = wc_get_product($item['product_id']);
+		$product->set_stock_quantity('100');
+        $product->set_stock_status('instock');
+        // Save the data and refresh caches
+        $product->save();
     });
 
     add_filter('simply_syncCustomer','simply_syncCustomer');
@@ -112,4 +130,5 @@
             $variation->save();
         }
     }
+
 ?>

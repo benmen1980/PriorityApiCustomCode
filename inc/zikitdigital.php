@@ -62,6 +62,10 @@ add_action('simply_update_product_data', function($item){
         update_post_meta( $item['product_id'], 'param10', $param10 );
         update_post_meta( $item['product_id'], 'param11', $param11 );
     }
+	
+	if (function_exists('dgwt_wcas_index_product')) {
+		dgwt_wcas_index_product($item['product_id']);
+	}
 });
 
 
@@ -83,40 +87,56 @@ add_action('simply_update_variation_data', function($item) {
     update_post_meta( $item['variation_id'], 'volume', $volume );
     is_numeric($weight) ? $weight : 0;
     update_post_meta( $item['variation_id'], 'weight1', $weight );
-    update_post_meta( $item['variation_id'], '_weight', $weight );
     update_post_meta( $item['variation_id'], 'param8', $param8 );
     update_post_meta( $item['variation_id'], 'param9', $param9 );
     update_post_meta( $item['variation_id'], 'param10', $param10 );
     update_post_meta( $item['variation_id'], 'param11', $param11 );
+	
+	if (function_exists('dgwt_wcas_index_product')) {
+		dgwt_wcas_index_product( $item['variation_id'] );
+	}
 
 });
 
 add_filter('simply_sync_priority_customers_to_wp','simply_sync_priority_customers_to_wp');
 function simply_sync_priority_customers_to_wp($user){
-    //    $wp_user_object = new WP_User($user['user_id']);
-    //    $wp_user_object -> set_role('');
+	
+    update_user_meta($user['user_id'], 'first_name', $user['SPEC19']);
 
-    if($user['STATDES'] == 'מוגבל')
+    if($user['STATDES'] == 'מוגבל' || $user['STATDES'] == 'לא פעיל')
     {
         $wp_user_object = new WP_User($user['user_id']);
         $wp_user_object -> set_role('');
+        $wp_user_object->save();
         //update_user_meta($user['user_id'], 'role', '');
     }
 
+    if($user['STATDES'] == 'פעיל' || $user['STATDES'] == 'זמני')
+    {
+        $user_data = get_userdata($user['user_id']);
+        if ($user_data) {
+            // Get user roles
+            $user_roles = $user_data->roles;
+            if(!empty($user_roles)) {
+                foreach ($user_roles as $key => $role) {
+                    continue;
+                }
+            } else {
+                $wp_user_object = new WP_User($user['user_id']);
+                $wp_user_object -> set_role('customer');
+                $wp_user_object -> set_user_pass($user['PHONE']);
+                wp_set_password($user['PHONE'], $user['user_id']);
+                $wp_user_object -> set_email($user['EMAIL']);
+                $wp_user_object->save(); 
+            
+            }
+        }
+        
+    }
+
+
 }
 
-add_filter('simply_sync_receipt_true', 'simply_sync_receipt_true_func', 2);
-function simply_sync_receipt_true_func($order){
-    $order_id = $data['orderId'];
-    $order = new \WC_Order($order_id);
-    $orderPayment = wc_get_payment_gateway_by_order($order);
-    if($orderPayment->id =='creditguard'){
-        return true;
-    }
-    else{
-        return false;
-    }
-}
 add_filter('simply_request_data', 'simply_func');
 function simply_func($data)
 {
@@ -145,22 +165,6 @@ function simply_func($data)
     return $data;
 }
 
-//add another email recipient for creditguard
-add_filter( 'woocommerce_email_recipient_new_order', 'payment_id_based_new_order_email_recipient', 10, 2 );
-function payment_id_based_new_order_email_recipient( $recipient, $order ){
-    // Avoiding backend displayed error in Woocommerce email settings (mandatory)
-    if( ! is_a($order, 'WC_Order') ) 
-        return $recipient;
-
-    // Here below set in the array the desired payment Ids
-    $orderPayment = wc_get_payment_gateway_by_order($order);
-   
-    if($orderPayment->id =='creditguard') {
-        $recipient .= ', ccpayzikit@gmail.com';
-    } 
-    return $recipient;
-}
-
 add_filter('woocommerce_package_rates', 'simply_change_shipping_method_based_on_cart_total', 11, 2);
 function simply_change_shipping_method_based_on_cart_total( $rates, $package ) {
     // here all the calculations
@@ -184,7 +188,7 @@ function simply_change_shipping_method_based_on_cart_total( $rates, $package ) {
         }
 
         //default weight
-        if (!$product_weight) $product_weight = 0;
+        if (!$product_weight) $product_weight = 1;
         $tot_weight_product = $item['quantity'] * $product_weight;
         $sum_weight+=$tot_weight_product;
         //סיכום ידני לעלות כוללת לעגלה ללא מעמ בגלל התנגשות תוסף הנחות
@@ -193,7 +197,7 @@ function simply_change_shipping_method_based_on_cart_total( $rates, $package ) {
         //סהכ משקל ניפחי לעגלה
         $product_volume = get_field('volume', $item['product_id']);
         //default volume
-        if (!$product_volume) $product_volume = 0;
+        if (!$product_volume) $product_volume = 1;
         $tot_volume_product = $item['quantity'] * $product_volume;
         $sum_volume+=$tot_volume_product;
 
@@ -203,9 +207,9 @@ function simply_change_shipping_method_based_on_cart_total( $rates, $package ) {
     $tot_weight = $sum_weight;
     //   סהכ משקל ניפחי
     $tot_volume=$sum_volume;
-    if($tot_weight<$tot_volume){
+    /*if($tot_weight<$tot_volume){
         $tot_weight=$tot_volume;
-    }
+    }*/
 
     // get number of packs כמות חבילות
     $num_packs = ceil($tot_weight / 19);
@@ -255,14 +259,15 @@ function simply_modify_orderitem($array){
 //        $percent_zikit = str_replace('%', '', $percent_zikit);
 //        }
     $data['ORDERITEMS_SUBFORM'][sizeof($data['ORDERITEMS_SUBFORM']) - 1]['PERCENT'] = (int)$percent_zikit;
-    
-    //set vatprice instead of vprice
-    // unset($data['ORDERITEMS_SUBFORM'][sizeof($data['ORDERITEMS_SUBFORM']) - 1]['VPRICE']);
-    // $quantity = (int)$item->get_quantity();
-    // $line_tax = (float)$item->get_subtotal_tax();
-    // $line_after_discount = (float)$item->get_total();
-    // $line_before_discount = (float)$item->get_subtotal();
-    // $data['ORDERITEMS_SUBFORM'][sizeof($data['ORDERITEMS_SUBFORM']) - 1]['VATPRICE'] = ($line_before_discount +  $line_tax) * $quantity;
+	
+	//set vatprice instead of vprice
+//     unset($data['ORDERITEMS_SUBFORM'][sizeof($data['ORDERITEMS_SUBFORM']) - 1]['VPRICE']);
+// 	$quantity = (int)$item->get_quantity();
+//     $line_tax = (float)$item->get_subtotal_tax();
+//     $line_after_discount = (float)$item->get_total();
+//     $line_before_discount = (float)$item->get_subtotal();
+//     $data['ORDERITEMS_SUBFORM'][sizeof($data['ORDERITEMS_SUBFORM']) - 1]['VATPRICE'] = ($line_before_discount +  $line_tax) * $quantity;
+
     $array['data'] = $data;
     return $array;
 
@@ -286,5 +291,25 @@ return "no";
 
 }*/
 
+//add another email recipient for creditguard
+add_filter( 'woocommerce_email_recipient_new_order', 'payment_id_based_new_order_email_recipient', 10, 2 );
+function payment_id_based_new_order_email_recipient( $recipient, $order ){
+    // Avoiding backend displayed error in Woocommerce email settings (mandatory)
+    if( ! is_a($order, 'WC_Order') ) 
+        return $recipient;
 
+    // Here below set in the array the desired payment Ids
+    $orderPayment = wc_get_payment_gateway_by_order($order);
+   
+    if($orderPayment->id =='creditguard') {
+        $recipient .= ', ccpayzikit@gmail.com';
+    } 
+    return $recipient;
+}
 
+add_filter('simply_request_data_receipt', 'simply_receipt_func');
+function simply_receipt_func($data)
+{
+    unset($data['CDES']);
+	return $data;
+}

@@ -81,7 +81,12 @@ function simply_syncProspect_func($json_request)
 add_filter('simply_syncItemsPriority_data', 'simply_syncItemsPriority_data_func');
 function simply_syncItemsPriority_data_func($data)
 {
-    $data['expand'] .= ',INTERNALDIALOGTEXT_SUBFORM';
+    $raw_option     = WooAPI::instance()->option( 'sync_items_priority_config' );
+    $raw_option     = str_replace( array( "\n", "\t", "\r" ), '', $raw_option );
+    $config         = json_decode( stripslashes( $raw_option ) );
+    $product_price_sale = ( ! empty( $config->product_price_sale ) ? $config->product_price_sale : null );
+
+    $data['expand'] .= ',INTERNALDIALOGTEXT_SUBFORM,PARTINCUSTPLISTS_SUBFORM($select=PLNAME,PRICE,VATPRICE;$filter=PLNAME eq \'' . $product_price_sale . '\')';
 	$data['select'] .= ',SAPL_COOLING,SAPL_ENERGY_RATING,SAPL_HEATING,SAPL_HORSEPOWER';
 	return $data;
 }
@@ -111,6 +116,37 @@ add_action('simply_update_product_data', function($item){
             'ID' => $product_id,
             'post_excerpt' => $short_text
         ));
+    }
+
+    /*
+    סנכרון מחירונים INTPTI ו INT 
+    עדיין לא הופעל מכיוון שמחכה לעדכון מבני לגבי בעיה עם מחירון INTPRO
+    */
+    //update INT and INTPRO price list to product
+    $set_tax = get_option('woocommerce_calc_taxes');
+    if ( ! empty( $item['PARTINCUSTPLISTS_SUBFORM'] ) ) {
+        foreach ($item['PARTINCUSTPLISTS_SUBFORM'] as $price_list) {
+            if ( $price_list != null && ! empty( $price_list['PLNAME'] == 'INTPRO') ) {
+                $pri_price = (wc_prices_include_tax() == true || $set_tax == 'no') ? $price_list['VATPRICE'] : $price_list['PRICE'];
+            } 
+            if ( $price_list != null && ! empty( $price_list['PLNAME'] == 'INT') ) {
+                $price_sale = (wc_prices_include_tax() == true || $set_tax == 'no') ? $price_list['VATPRICE'] : $price_list['PRICE'];
+            }
+        }
+    } /*else {
+        $pri_price = (wc_prices_include_tax() == true || $set_tax == 'no') ? $item['VATPRICE'] : $item['BASEPLPRICE'];
+    }*/
+    if ( $product_id !== 0 ) {
+        // price
+        // $my_product = new \WC_Product( $product_id );
+        if ( $pri_price != 0 ) {
+            update_post_meta( $product_id, '_price', $pri_price );
+        }
+        
+        if ( $price_sale != 0 ) {
+            update_post_meta( $product_id, '_sale_price', $price_sale );
+        }
+        // $my_product->save();
     }
 
 });

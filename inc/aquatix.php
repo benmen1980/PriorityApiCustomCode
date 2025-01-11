@@ -13,19 +13,40 @@
         return $custdes;
     };
 
-    add_action('simply_update_product_data', function($item){
-        $textToAdd =  $item['EPARTDES'];
-        $id = $item['product_id'];
+add_action('simply_update_product_data', function($item){
+		$textToAdd =  $item['EPARTDES'];
+		$id = $item['product_id'];
+// 		$searchText = 'למוצרים נוספים מחברת:';
 
-        update_field('product_description_language', $textToAdd, $id);
-    });
+// 		// Get the product and its current short description
+// 		$product = wc_get_product($id);
+// 		if ( $product ) {
+// 			$short_description = $product->get_short_description();
+// 			if (stripos($short_description, $searchText) !== false) {
+// 				$short_description = str_ireplace($searchText, '', $short_description);
 
-    add_filter('simply_request_data', 'simply_func');
-    function simply_func($data)
-    {
-        if (isset($data['CDES'])){
-            unset($data['CDES']);
-        };
-        return $data;
-    }
+// 				$product->set_short_description($short_description);
+// 				$product->save();
+// 			}
+
+// 			if (stripos($short_description, $textToAdd) !== false) {
+// 				$short_description = str_ireplace($textToAdd, '', $short_description);
+
+// 				$product->set_short_description($short_description);
+// 				$product->save();
+// 			}
+		update_field('product_description_language', $textToAdd, $id);
+// 		}
+
+// 		return $product;
+});
+
+add_filter('simply_request_data', 'simply_func');
+function simply_func($data)
+{
+    if (isset($data['CDES'])){
+        unset($data['CDES']);
+    };
+    return $data;
+}
 ?>
