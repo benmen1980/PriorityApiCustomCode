@@ -84,12 +84,121 @@ function simply_syncItemsPriority_data_func($data)
     $raw_option     = WooAPI::instance()->option( 'sync_items_priority_config' );
     $raw_option     = str_replace( array( "\n", "\t", "\r" ), '', $raw_option );
     $config         = json_decode( stripslashes( $raw_option ) );
+    $product_price_list = ( ! empty( $config->product_price_list ) ? $config->product_price_list : null );
     $product_price_sale = ( ! empty( $config->product_price_sale ) ? $config->product_price_sale : null );
 
     $data['expand'] .= ',INTERNALDIALOGTEXT_SUBFORM,PARTINCUSTPLISTS_SUBFORM($select=PLNAME,PRICE,VATPRICE;$filter=PLNAME eq \'' . $product_price_sale . '\')';
-	$data['select'] .= ',SAPL_COOLING,SAPL_ENERGY_RATING,SAPL_HEATING,SAPL_HORSEPOWER';
+	$data['expand'] = '$expand=INTERNALDIALOGTEXT_SUBFORM,PARTUNSPECS_SUBFORM,PARTTEXT_SUBFORM,PARTINCUSTPLISTS_SUBFORM($select=PLNAME,PRICE,VATPRICE;$filter=(PLNAME eq \'' . $product_price_list . '\' or PLNAME eq \'' . $product_price_sale . '\'))';
+    $data['select'] .= ',SAPL_COOLING,SAPL_ENERGY_RATING,SAPL_HEATING,SAPL_HORSEPOWER';
 	return $data;
 }
+
+add_filter('simply_syncPricePriority', 'simply_syncPricePriority_func');
+function simply_syncPricePriority_func($data)
+{
+    $raw_option     = WooAPI::instance()->option( 'sync_items_priority_config' );
+    $raw_option     = str_replace( array( "\n", "\t", "\r" ), '', $raw_option );
+    $config         = json_decode( stripslashes( $raw_option ) );
+    $product_price_list = ( ! empty( $config->product_price_list ) ? $config->product_price_list : null );
+    $product_price_sale = ( ! empty( $config->product_price_sale ) ? $config->product_price_sale : null );
+
+    //$data['expand'] .= ',INTERNALDIALOGTEXT_SUBFORM,PARTINCUSTPLISTS_SUBFORM($select=PLNAME,PRICE,VATPRICE;$filter=PLNAME eq \'' . $product_price_sale . '\')';
+	$data['expand'] = '$expand=INTERNALDIALOGTEXT_SUBFORM,PARTUNSPECS_SUBFORM,PARTTEXT_SUBFORM,PARTINCUSTPLISTS_SUBFORM($select=PLNAME,PRICE,VATPRICE;$filter=(PLNAME eq \'' . $product_price_list . '\' or PLNAME eq \'' . $product_price_sale . '\'))';
+	return $data;
+}
+
+//sync all product pricelist int and intpro
+add_action('customSyncPricePriority_cron_hook', 'customSyncPricePriority');
+
+if (!wp_next_scheduled('customSyncPricePriority_cron_hook')) {
+
+   $res = wp_schedule_event(time(), 'daily', 'customSyncPricePriority_cron_hook');
+
+}
+
+// function customSyncPricePriority(){
+//     WooAPI::instance()->syncPricePriority();
+// }
+
+
+function customSyncPricePriority()
+{
+    $raw_option = WooAPI::instance()->option('sync_items_priority_config');
+    $raw_option = str_replace(array("\n", "\t", "\r"), '', $raw_option);
+    $config = json_decode(stripslashes($raw_option));
+    $product_price_list = (!empty($config->product_price_list) ? $config->product_price_list : null);
+    $product_price_sale = (!empty($config->product_price_sale) ? $config->product_price_sale : null);
+    $search_field        = ( ! empty( $config->search_by ) ? $config->search_by : 'PARTNAME' );
+    $search_field_web    = ( ! empty( $config->search_field_web ) ? $config->search_field_web : '_sku' );
+    //$url_addition_config = (!empty($config->additional_url) ? '&$filter=' . $config->additional_url : '');
+    $expand = '$expand=PARTINCUSTPLISTS_SUBFORM($select=PLNAME,PRICE,VATPRICE;$filter=(PLNAME eq \'' . $product_price_list . '\' or PLNAME eq \'' . $product_price_sale . '\'))';
+    $response =  WooAPI::instance()->makeRequest('GET', 'LOGPART?$select=PARTNAME &$filter=SHOWINWEB eq \'Y\'  &' . $expand . ''
+        , [],  WooAPI::instance()->option('log_items_priority', true));
+    if ($response['status']) {
+
+        $response_data = json_decode($response['body_raw'], true);
+        foreach ($response_data['value'] as $item) {
+            // if product exsits, update price
+            $search_by_value = (string)$item[$search_field];
+            $args = array('post_type' => array('product', 'product_variation'),
+                'post_status' => array('publish', 'draft'),
+                'meta_query' => array(
+                    array(
+                        'key' => $search_field_web,
+                        'value' => $search_by_value
+                    )
+                )
+            );
+            $product_id = 0;
+            $my_query = new \WP_Query($args);
+            if ($my_query->have_posts()) {
+                while ($my_query->have_posts()) {
+                    $my_query->the_post();
+                    $product_id = get_the_ID();
+                }
+            }
+            //check if WooCommerce Tax Settings are set
+            $set_tax = get_option('woocommerce_calc_taxes');
+
+
+            
+            if ( $product_id !== 0 ) {
+
+                $my_product = wc_get_product( $product_id );
+
+                if ( ! empty( $item['PARTINCUSTPLISTS_SUBFORM'] ) ) {
+                    foreach ($item['PARTINCUSTPLISTS_SUBFORM'] as $price_list) {
+                        if ( $price_list != null && ! empty( $price_list['PLNAME'] == 'INTPRO') ) {
+                            $pri_price = (wc_prices_include_tax() == true || $set_tax == 'no') ? $price_list['VATPRICE'] : $price_list['PRICE'];
+                            $my_product->set_regular_price( $pri_price );
+                        } 
+                        elseif ( $price_list != null && ! empty( $price_list['PLNAME'] == 'INT') ) {
+                            $price_sale = (wc_prices_include_tax() == true || $set_tax == 'no') ? $price_list['VATPRICE'] : $price_list['PRICE'];
+                            $my_product->set_sale_price( $price_sale );
+                        }
+                    }
+                    $my_product->save();
+                }  
+            }
+        }
+        // add timestamp
+
+        //$this->updateOption('items_priority_update', time());
+    } else {
+
+        WooAPI::instance()->sendEmailError(
+
+            WooAPI::instance()->option('email_error_sync_items_priority'),
+
+            'Error Sync Items price lisr Priority',
+
+            $response['body']
+
+        );
+    }
+    return $response;
+}
+
 
 add_action('simply_update_product_data', function($item){
     $product_id = $item['product_id'];
@@ -129,7 +238,7 @@ add_action('simply_update_product_data', function($item){
             if ( $price_list != null && ! empty( $price_list['PLNAME'] == 'INTPRO') ) {
                 $pri_price = (wc_prices_include_tax() == true || $set_tax == 'no') ? $price_list['VATPRICE'] : $price_list['PRICE'];
             } 
-            if ( $price_list != null && ! empty( $price_list['PLNAME'] == 'INT') ) {
+            elseif ( $price_list != null && ! empty( $price_list['PLNAME'] == 'INT') ) {
                 $price_sale = (wc_prices_include_tax() == true || $set_tax == 'no') ? $price_list['VATPRICE'] : $price_list['PRICE'];
             }
         }
@@ -137,16 +246,22 @@ add_action('simply_update_product_data', function($item){
         $pri_price = (wc_prices_include_tax() == true || $set_tax == 'no') ? $item['VATPRICE'] : $item['BASEPLPRICE'];
     }*/
     if ( $product_id !== 0 ) {
-        // price
-        // $my_product = new \WC_Product( $product_id );
-        if ( $pri_price != 0 ) {
-            update_post_meta( $product_id, '_price', $pri_price );
+        $my_product = wc_get_product( $product_id );
+
+        if ( $my_product ) { // Ensure product object is valid
+            // Update regular price if provided
+            if ( $pri_price != 0 ) {
+                $my_product->set_regular_price( $pri_price ); // Use set_regular_price
+            }
+    
+            // Update sale price if provided
+            if ( $price_sale != 0 ) {
+                $my_product->set_sale_price( $price_sale ); // Use set_sale_price
+            }
+    
+            // Save the product to persist changes
+            $my_product->save();
         }
-        
-        if ( $price_sale != 0 ) {
-            update_post_meta( $product_id, '_sale_price', $price_sale );
-        }
-        // $my_product->save();
     }
 
 });
@@ -251,17 +366,35 @@ function simply_sync_inventory_priority_func($item)
     return $item;
 }
 
+add_action('simply_after_receipt_func_cron_hook', 'simply_after_receipt_func');
+// Schedule the task to run daily at midnight
+if (!wp_next_scheduled('simply_after_receipt_func_cron_hook')) {
+    $res = wp_schedule_event(time(), 'daily', 'simply_after_receipt_func_cron_hook');
+}
 
-/*
-קוד לסגירת חקבלה כבר בשידור בפניה ל hub2node,
-זה לא עלה כי עדיין יש בעיה בתקשורת לפריוריטי, 
-בטיפול של רועי
+
+function update_receipt_status($ivnum)
+{
+    $data = ['STATDES' => "מאושרת"];
+
+    $response = WooAPI::instance()->makeRequest('PATCH',
+    'TINVOICES(IVNUM=\'' . $ivnum . '\',IVTYPE=\'T\',DEBIT=\'D\')', ['body' => json_encode($data)], true );
+
+    if ($response['status']) {
+        $response_data = json_decode($response['body_raw'], true);
+        // updte_post_meta($cprof_id'cprof_status', 'הוזמן מהחנות');
+    }
+}
+
+//close receipt
 add_filter('simply_after_post_receipt', 'simply_after_receipt_func');
 function simply_after_receipt_func($array)
 {
     // $ord_status = $array["STATDES"];
-    $ord_number = $array["IVNUM"]; 
-
+    $receipt_number = $array["IVNUM"]; 
+    $order_id = $array["order_id"];
+    
+    update_receipt_status($receipt_number);
     $username = WooAPI::instance()->option('username');
     $password = WooAPI::instance()->option('password');
     $url = 'https://'.WooAPI::instance()->option('url');
@@ -273,7 +406,7 @@ function simply_after_receipt_func($array)
     $appid = WooAPI::instance()->option('X-App-Id');
     $appkey = WooAPI::instance()->option('X-App-Key');
 
-    $data['IVNUM'] = $ord_number;
+    $data['IVNUM'] = $receipt_number;
     $data['credentials']['appname'] = 'demo';
     $data['credentials']['username'] = $username;
     $data['credentials']['password'] = $password;
@@ -303,16 +436,26 @@ function simply_after_receipt_func($array)
     ));
 
     $response = curl_exec($curl);
-    if ($response['status']) {
-        $response_data = json_decode($response['body_raw'], true);
-    };
-
-    $array['IVNUM'] = $response_data['value']; 
-    $array['STATDES'] = $response_data['value']; 
-
+    $response_data = json_decode($response, true);
+    $res = curl_getinfo($curl);
+    if ($res['http_code'] <= 201) {
+        if (isset($response_data['ivnum'])) {
+            $order = wc_get_order($order_id);
+            $order->update_meta_data('priority_recipe_number', $response_data['ivnum']);
+            $order->update_meta_data('priority_recipe_status', 'סגורה');
+			$order->save(); 
+            //wp_mail('elisheva.g@simplyct.co.il','success close receipt', $response_data['ivnum']);
+        }
+    }
+    else{
+        if (isset($response_data['message'])) {
+            $msg = $response_data['message'];
+        } else {
+            $msg = "No error message found.";
+        }
+        //wp_mail('elisheva.g@simplyct.co.il','close receipt', $msg.' error code'.$res['code']);
+        $order->update_meta_data('priority_recipe_status', $msg);
+    }
     curl_close($curl);
 
-    return $array;
-
-
-}*/
+}

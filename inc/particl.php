@@ -56,6 +56,9 @@ function simply_request_data_func($data)
             $data['AINVOICEITEMS_SUBFORM'][sizeof($data['AINVOICEITEMS_SUBFORM']) - 1]['TOTPRICE'] = (float)$order->get_cart_tax();
         }
     }
+
+    //wait for client to allow this change
+    //$data['IVDATE'] = date('Y-m-d h:i:sa', strtotime('-4 hours', strtotime($order->get_date_created())));
     return $data;
 }
 
