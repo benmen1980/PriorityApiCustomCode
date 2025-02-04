@@ -40,17 +40,26 @@ function simply_search_customer_in_priority_func($data){
                 return $data;
             }
             else{
-                $subj = 'Error user not belong to priority';
-                wp_mail( get_option('admin_email'), $subj,$email.' not exist in priority' );
+                //$subj = 'Error user not belong to priority';
+                //wp_mail( get_option('admin_email'), $subj,$email.' not exist in priority' );
+                $custname = WooAPI::instance()->option('walkin_number');
+                $data['CUSTNAME'] = $custname;
+                return $data;
             }
         } else{
-            $subj = 'Error user not belong to priority';
-            wp_mail( get_option('admin_email'), $subj,$response['body'] );
+            //$subj = 'Error user not belong to priority';
+            //wp_mail( get_option('admin_email'), $subj,$response['body'] );
+            $custname = WooAPI::instance()->option('walkin_number');
+            $data['CUSTNAME'] = $custname;
+            return $data;
         }
     }
     else{
-        $subj = 'Error user not exist!';
-        wp_mail( get_option('admin_email'), $subj, $order->id.'order not belong to any user!' );
+        $custname = WooAPI::instance()->option('walkin_number');
+        $data['CUSTNAME'] = $custname;
+        return $data;
+        //$subj = 'Error user not exist!';
+        //wp_mail( get_option('admin_email'), $subj, $order->id.'order not belong to any user!' );
     }
   
 }
