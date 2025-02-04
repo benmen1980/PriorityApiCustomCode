@@ -68,7 +68,8 @@ function simply_func($data)
             'CELLPHONE' => $order->get_billing_phone(),
             'EMAIL' => $order->get_billing_email(),
             'ADDRESS' => $order->get_billing_address_1(),
-            'STATEA' => get_post_meta($data['orderId'], '_billing_delivery_city', true),
+            //'STATEA' => get_post_meta($data['orderId'], '_billing_delivery_city', true),
+            'STATEA' => $order->get_meta('_billing_delivery_city'),
             'ZIP' => $order->get_shipping_postcode(),
             'ADDRESS2' => !empty(get_post_meta($data['orderId'], '_billing_delivery_floor', true)) ? get_post_meta($data['orderId'], '_billing_delivery_floor', true) : '',
             'ADDRESS3' => !empty(get_post_meta($data['orderId'], '_billing_delivery_apartment', true)) ? get_post_meta($data['orderId'], '_billing_delivery_apartment', true) : '',
@@ -97,7 +98,8 @@ function simply_post_prospect_func($json)
     unset($json['STATEA']);
 
     $json['ADDRESS'] = $order->get_billing_address_1() . (!empty(get_post_meta($id, '_billing_delivery_floor', true)) ? ' קומה ' . get_post_meta($id, '_billing_delivery_floor', true) : '') . (!empty(get_post_meta($id, '_billing_delivery_apartment', true)) ? ' דירה ' . get_post_meta($id, '_billing_delivery_apartment', true) : '');
-    $json['STATEA'] = get_post_meta($id, '_billing_delivery_city', true);
+    //$json['STATEA'] = get_post_meta($id, '_billing_delivery_city', true);
+    $json['STATEA'] = $order->get_meta('_billing_delivery_city');
     return $json;    
 }
 
@@ -112,7 +114,8 @@ function simply_syncCustomer_func($request)
     unset($request['STATEA']);
 
     $request['ADDRESS'] = $order->get_billing_address_1() . (!empty(get_post_meta($id, '_billing_delivery_floor', true)) ? ' קומה ' . get_post_meta($id, '_billing_delivery_floor', true) : '') . (!empty(get_post_meta($id, '_billing_delivery_apartment', true)) ? ' דירה ' . get_post_meta($id, '_billing_delivery_apartment', true) : '');
-    $request['STATEA'] = get_post_meta($id, '_billing_delivery_city', true); 
+    //$request['STATEA'] = get_post_meta($id, '_billing_delivery_city', true);
+    $request['STATEA'] = $order->get_meta('_billing_delivery_city');  
     return $request;   
 }
 
@@ -141,7 +144,8 @@ function simply_search_customer_in_priority($data){
                     'CUSTDES' => !empty($company_name) ? $company_name : $order->get_billing_first_name() . ' ' . $order->get_billing_last_name(),
                     'EMAIL' => $order->get_billing_email(),
                     'ADDRESS' => $order->get_billing_address_1() . (!empty(get_post_meta($order->id, '_billing_delivery_floor', true)) ? ' קומה ' . get_post_meta($order->id, '_billing_delivery_floor', true) : '') . (!empty(get_post_meta($order->id, '_billing_delivery_apartment', true)) ? ' דירה ' . get_post_meta($order->id, '_billing_delivery_apartment', true) : ''),
-                    'STATEA' => get_post_meta($order->id, '_billing_delivery_city', true),
+                    //'STATEA' => get_post_meta($order->id, '_billing_delivery_city', true),
+                    'STATEA' => $order->get_meta('_billing_delivery_city'),
                     'ZIP' => $order->get_shipping_postcode(),
                     'PHONE' => $order->get_billing_phone(),
                     'NSFLAG' => 'Y',
