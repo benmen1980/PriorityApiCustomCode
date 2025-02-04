@@ -311,5 +311,6 @@ add_filter('simply_request_data_receipt', 'simply_receipt_func');
 function simply_receipt_func($data)
 {
     unset($data['CDES']);
+    unset($data['BOOKNUM']);
 	return $data;
 }
