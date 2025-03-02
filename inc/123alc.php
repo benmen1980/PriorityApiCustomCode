@@ -31,6 +31,9 @@ function syncInventoryPriority()
     $response = WooAPI::instance()->makeRequest('GET', 
     'LOGPART?$select='.$data['select'].'&$filter='.$url_addition.' and SHOWINWEB eq \'Y\' ', [], 
     WooAPI::instance()->option('log_inventory_priority', true));
+    // $response = WooAPI::instance()->makeRequest('GET', 
+    // 'LOGPART?$select='.$data['select'].'&$filter=SHOWINWEB eq \'Y\' ', [], 
+    // WooAPI::instance()->option('log_inventory_priority', true));
     
     // check response status 
     if ($response['status']) {
@@ -65,7 +68,6 @@ function syncInventoryPriority()
                 } else {
                     $stock_status = 'outofstock';
                 }
-
                 $product = wc_get_product($product_id);
                 if ($product->post_type == 'product_variation') {
                     $var = new \WC_Product_Variation($product_id);
@@ -112,6 +114,14 @@ if (!wp_next_scheduled('sync_inventory_priority_hook')) {
 add_filter('simply_request_data', 'simply_request_data_func');
 function simply_request_data_func($data)
 {
+    $id_order = $data["orderId"];
+    $order = new \WC_Order($id_order);
+    $billing_building = $order->get_meta('_billing_building');
+    $billing_apartment_number = $order->get_meta('_billing_apartment_number');  
+    $billing_floor_field = $order->get_meta('_billing_floor'); 
+    $data['SHIPTO2_SUBFORM']['ADDRESS'] = $order->get_billing_address_1().' '.$billing_building;
+    $data['SHIPTO2_SUBFORM']['ADDRESS2'] = $billing_apartment_number; 
+    $data['SHIPTO2_SUBFORM']['ADDRESS3'] = $billing_floor_field; 
     $tomorrow = strtotime('tomorrow');
     $data['DUEDATE'] = date('Y-m-d', $tomorrow);
     $data['ORDSTATUSDES'] = "טיוטא";
