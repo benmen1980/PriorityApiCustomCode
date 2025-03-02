@@ -1,7 +1,8 @@
 <?php
 use PriorityWoocommerceAPI\WooAPI;
 
-add_action('syncItemsPriority_hook', 'syncItemsPriority');
+//sync item is coming now from sync plugin and run inserver job 
+//add_action('syncItemsPriority_hook', 'syncItemsPriority');
 
 if (!wp_next_scheduled('syncItemsPriority_hook')) {
 
@@ -679,6 +680,7 @@ function import_finish() {
     //wp_update_term_count_now(get_terms(['taxonomy' => 'product_cat', 'fields' => 'ids']), 'product_cat'); // Updates counts.
     wc_update_product_lookup_tables();
 }
+
 function recursive_add_categories( $categories ) {
     $category_ids = [];
     $parent_id    = 0;
@@ -838,93 +840,207 @@ add_action('syncInventoryPriority_hook', 'syncInventoryPriority');
 
 if (!wp_next_scheduled('syncInventoryPriority_hook')) {
 
-   $res = wp_schedule_event(time(), 'every_five_minutes', 'syncInventoryPriority_hook');
+   //$res = wp_schedule_event(time(), 'every_five_minutes', 'syncInventoryPriority_hook');
+   wp_schedule_event(time(), 'ten_minutes', 'syncInventoryPriority_hook');
 
 }
 /**
  * sync inventory from priority
  */
 
+ function syncInventoryPriority_old()
+ {
+     $index = 0;
+     $step  = 100;
+  
+     $response_data       = [ 0 ];
+      // get the items simply by time stamp of today
+      $daysback_options = explode(',', WooAPI::instance()->option('sync_inventory_warhsname'))[3];
+      //$daysback = intval(!empty($daysback_options) ? $daysback_options : 1); // change days back to get inventory of prev days
+      $daysback = 60;
+     $stamp = mktime(1 - ($daysback * 24), 0, 0);
+      $bod = date(DATE_ATOM, $stamp);
+      $url_addition = '('. rawurlencode('WARHSTRANSDATE ge ' . $bod . ' or PURTRANSDATE ge ' . $bod . ' or SALETRANSDATE ge ' . $bod) . ')';
+  
+      
+      $data['select'] = 'PARTNAME';
+  
+  
+      
+      $expand = '$expand=PARTBALANCE_SUBFORM($select=WARHSNAME,TBALANCE)';
+      
+      
+      $data['expand'] = $expand;
+      while ( sizeof( $response_data ) > 0 ) {
+         //     $response = WooAPI::instance()->makeRequest('GET', 'LOGPART?$select='.$data['select'].'&$filter='.$url_addition.' and INVFLAG eq \'Y\' &' . $data['expand'], [], WooAPI::instance()->option('log_inventory_priority', true));
+      $response = WooAPI::instance()->makeRequest('GET', 'LOGPART?$select='.$data['select'].'&$filter='.$url_addition.' and INVFLAG eq \'Y\' &$skip=' . $index . '&$top=' . $step . '&' . $data['expand'], [], true);
+      // check response status
+      echo 'custom sync inventory';
+      echo "<pre>";
+      print_r($response);
+      echo "</pre>";
+      die();
+      if ($response['status']) {
+          $response_data = json_decode($response['body_raw'], true)['value'];
+          foreach ($response_data as $item) {
+              // if product exsits, update
+              $field =  'PARTNAME';
+              $args = array(
+                  'post_type' => array('product', 'product_variation'),
+                  'meta_query' => array(
+                      array(
+                          'key' => '_sku',
+                          'value' => $item[$field]
+                      )
+                  )
+              );
+              $my_query = new \WP_Query($args);
+              if ($my_query->have_posts()) {
+                  while ($my_query->have_posts()) {
+                      $my_query->the_post();
+                      $product_id = get_the_ID();
+                  }
+              } else {
+                  $product_id = 0;
+              }
+              //if ($id = wc_get_product_id_by_sku($item['PARTNAME'])) {
+              if (!$product_id == 0) {
+                  // update_post_meta($product_id, '_sku', $item['PARTNAME']);
+                  // get the stock by part availability
+                  
+                  // get the stock by specific warehouse
+                  
+                  foreach ($item['PARTBALANCE_SUBFORM'] as $wh_stock) {
+                      $store = $wh_stock['WARHSNAME'];
+                      if (function_exists('simplyct_set_stock')) {
+                          simplyct_set_stock( $item[$field], $store, $wh_stock['TBALANCE'] );
+                      }
+                     
+                  }
+                  
+        
+           
+     
+              }
+          }
+          $index          += $step;
+          //break;
+          // add timestamp
+          //WooAPI::instance()->updateOption('inventory_priority_update', time());
+      } else {
+          /**
+           * t149
+           */
+          WooAPI::instance()->sendEmailError(
+              WooAPI::instance()->option('email_error_sync_inventory_priority'),
+              'Error Sync Inventory Priority',
+              $response['body']
+          );
+          break;
+      }
+     }
+ }
+
+ add_filter('cron_schedules', 'custom_cron_schedules');
+
+function custom_cron_schedules($schedules) {
+    $schedules['ten_minutes'] = array(
+        'interval' => 10 * 60, // 10 minutes in seconds
+        'display'  => __('Every 10 Minutes')
+    );
+    return $schedules;
+}
+
 function syncInventoryPriority()
 {
-
-    // get the items simply by time stamp of today
-    $daysback_options = explode(',', WooAPI::instance()->option('sync_inventory_warhsname'))[3];
-    $daysback = intval(!empty($daysback_options) ? $daysback_options : 1); // change days back to get inventory of prev days
-    $stamp = mktime(1 - ($daysback * 24), 0, 0);
-    $bod = date(DATE_ATOM, $stamp);
-    $url_addition = '('. rawurlencode('WARHSTRANSDATE ge ' . $bod . ' or PURTRANSDATE ge ' . $bod . ' or SALETRANSDATE ge ' . $bod) . ')';
-
+    $index = 0;
+    $step  = 2000;
+ 
+    $response_data       = [ 0 ];
+     // get the items simply by time stamp of today
+     $daysback_options = explode(',', WooAPI::instance()->option('sync_inventory_warhsname'))[3];
+     //$daysback = intval(!empty($daysback_options) ? $daysback_options : 1); // change days back to get inventory of prev days
+     $daysback = 20;
+	 //$stamp = mktime(1 - ($daysback * 24), 0, 0);
+     //evry 30 minutes
+	 $stamp = time() - (30 * 60); 
+     $bod = date(DATE_ATOM, $stamp);
+     $query = "WARHSTRANSDATE ge $bod or PURTRANSDATE ge $bod or SALETRANSDATE ge $bod";
+	 $url_addition = '('. rawurlencode($query) . ')';
+     
+     $data['select'] = 'PARTNAME';
+ 
+ 
+     
+     $expand = '$expand=PARTBALANCE_SUBFORM($select=WARHSNAME,TBALANCE)';
+     
+     
+     $data['expand'] = $expand;
+     while ( sizeof( $response_data ) > 0 ) {
+        //     $response = WooAPI::instance()->makeRequest('GET', 'LOGPART?$select='.$data['select'].'&$filter='.$url_addition.' and INVFLAG eq \'Y\' &' . $data['expand'], [], WooAPI::instance()->option('log_inventory_priority', true));
+     $response = WooAPI::instance()->makeRequest('GET', 'LOGPART?$select='.$data['select'].'&$filter='.$url_addition.' and INVFLAG eq \'Y\' &$skip=' . $index . '&$top=' . $step . '&' . $data['expand'], [], true);
+     // check response status
+//      echo 'custom sync inventory';
+//      echo "<pre>";
+//      print_r($response);
+//      echo "</pre>";
+//      die();
+     if ($response['status']) {
+         $response_data = json_decode($response['body_raw'], true)['value'];
+         foreach ($response_data as $item) {
+             // if product exsits, update
+             $field =  'PARTNAME';
+             $args = array(
+                 'post_type' => array('product', 'product_variation'),
+                 'meta_query' => array(
+                     array(
+                         'key' => '_sku',
+                         'value' => $item[$field]
+                     )
+                 )
+             );
+             $my_query = new \WP_Query($args);
+             if ($my_query->have_posts()) {
+                 while ($my_query->have_posts()) {
+                     $my_query->the_post();
+                     $product_id = get_the_ID();
+                 }
+             } else {
+                 $product_id = 0;
+             }
+             //if ($id = wc_get_product_id_by_sku($item['PARTNAME'])) {
+             if (!$product_id == 0) {
+                 // update_post_meta($product_id, '_sku', $item['PARTNAME']);
+                 // get the stock by part availability
+                 
+                 // get the stock by specific warehouse
+                 
+                 foreach ($item['PARTBALANCE_SUBFORM'] as $wh_stock) {
+                     $store = $wh_stock['WARHSNAME'];
+                     if (function_exists('simplyct_set_stock')) {
+                         simplyct_set_stock( $item[$field], $store, $wh_stock['TBALANCE'] );
+                     }
+                 }
+	             simplyct_set_stock_availability($product_id);
+       
+          
     
-    $data['select'] = 'PARTNAME';
-
-
-    
-    $expand = '$expand=LOGCOUNTERS_SUBFORM,PARTBALANCE_SUBFORM($select=WARHSNAME,TBALANCE)';
-        
-    
-    $data['expand'] = $expand;
-    $response = WooAPI::instance()->makeRequest('GET', 'LOGPART?$select='.$data['select'].'&$filter='.$url_addition.' and INVFLAG eq \'Y\' &' . $data['expand'], [], WooAPI::instance()->option('log_inventory_priority', false));
-    //$response = WooAPI::instance()->makeRequest('GET', 'LOGPART?$select='.$data['select'].'&$filter='.$url_addition.' or PARTNAME eq \'ORB-1023769\' and INVFLAG eq \'Y\' &' . $data['expand'], [], WooAPI::instance()->option('log_inventory_priority', false));
-    // check response status       
-    echo 'custom sync inventory';
-    echo "<pre>";
-    print_r($response);
-    echo "</pre>";
-    if ($response['status']) {
-        $data = json_decode($response['body_raw'], true);
-        foreach ($data['value'] as $item) {
-            // if product exsits, update
-            $field =  'PARTNAME';
-            $args = array(
-                'post_type' => array('product', 'product_variation'),
-                'meta_query' => array(
-                    array(
-                        'key' => '_sku',
-                        'value' => $item[$field]
-                    )
-                )
-            );
-            $my_query = new \WP_Query($args);
-            if ($my_query->have_posts()) {
-                while ($my_query->have_posts()) {
-                    $my_query->the_post();
-                    $product_id = get_the_ID();
-                }
-            } else {
-                $product_id = 0;
-            }
-            //if ($id = wc_get_product_id_by_sku($item['PARTNAME'])) {
-            if (!$product_id == 0) {
-                // update_post_meta($product_id, '_sku', $item['PARTNAME']);
-                // get the stock by part availability
-                
-                // get the stock by specific warehouse
-                
-                foreach ($item['PARTBALANCE_SUBFORM'] as $wh_stock) {
-                    $store = $wh_stock['WARHSNAME'];
-                    if (function_exists('simplyct_set_stock')) {
-                        simplyct_set_stock( $item[$field], $store, $wh_stock['TBALANCE'] );
-                    }
-                   
-                }
-                
-      
-         
-   
-            }
-        }
-        // add timestamp
-        //WooAPI::instance()->updateOption('inventory_priority_update', time());
-    } else {
-        /**
-         * t149
-         */
-        WooAPI::instance()->sendEmailError(
-            WooAPI::instance()->option('email_error_sync_inventory_priority'),
-            'Error Sync Inventory Priority',
-            $response['body']
-        );
+             }
+         }
+         $index          += $step;
+         // add timestamp
+         //WooAPI::instance()->updateOption('inventory_priority_update', time());
+     } else {
+         /**
+          * t149
+          */
+         WooAPI::instance()->sendEmailError(
+             WooAPI::instance()->option('email_error_sync_inventory_priority'),
+             'Error Sync Inventory Priority',
+             $response['body']
+         );
+         break;
+     }
     }
 }
 
