@@ -91,30 +91,52 @@ function simply_func($data){
 	$coupon = $order->get_coupon_codes();
 	$items = [];
     foreach($data['ORDERITEMS_SUBFORM'] as $item ){
-        if($item['PARTNAME']=='000'){
+		$sku = $item['PARTNAME'];
+		$product_id = wc_get_product_id_by_sku($sku);
+		//if coupon or shipping
+		if(!$product_id){
 			$vatprice = $item['VATPRICE'];
 			unset($item['VATPRICE']);
             $item['VPRICE'] =  $vatprice;
-			if(!empty($coupon)){
-				$item['PDES'] = $coupon[0];
+			//coupon
+			if($item['PARTNAME'] == '000' ){
+				if(!empty($coupon) && $item['TQUANT'] == -1){
+					$item['PDES'] = $coupon[0];
+				}
+			}
+			//remove shipping if shiping has cost
+			else{
+				if($item['VPRICE'] > 0){
+					continue;
+				}
 			}
 			
-        }
+		}
+        // if($item['PARTNAME'] == '000' ){
+		// 	if(!empty($coupon) && $item['TQUANT'] == -1){
+		// 		$item['PDES'] = $coupon[0];
+		// 	}
+		// 	//shipping
+		// 	else{
+		// 		$item['PDES'] = $order->get_shipping_method();
+		// 		if ( 'איסוף עצמי' === $order_shipping_method ) {
+		// 			$item['PARTNAME']  = '60';
+		// 		}
+		// 		// } elseif ( 'שליח עד הבית חינם' === $order_shipping_method ) {
+		// 		// 	$item['PARTNAME']  = '10';
+		// 		// } elseif ( 'שליח עד הבית' === $order_shipping_method ) {
+		// 		// 	$item['PARTNAME']  = '20';
+		// 		// } elseif ( 'שליח מוזל' === $order_shipping_method ) {
+		// 		// 	$item['PARTNAME']  = '30';
+		// 		// } elseif ( 'בוקסיט' === $order_shipping_method ) {
+		// 		// 	$item['PARTNAME']  = '40';
+		// 		// }
+		// 	}
+			
+        // }
         $items[] = $item;
     }
     $data['ORDERITEMS_SUBFORM'] = $items;
-
-
-	//add partname 60 for איסוף עצמי
-	if ( 'איסוף עצמי' === $order_shipping_method ) {
-		$data['ORDERITEMS_SUBFORM'][] = [
-			'PARTNAME' => '60',
-			'TQUANT' => (int)1,
-			'PDES' => $order_shipping_method,
-			'DUEDATE' => date('Y-m-d'),
-			'VATPRICE' => 0
-		];
-	}
 
 	return $data;
 }
@@ -226,6 +248,22 @@ function simply_update_variation_price_func($variation_data){
     $variation_id = wc_get_product_id_by_sku($variation_data['sku']);
     $product = wc_get_product($variation_id);
 	$parent_product_id = $product->get_parent_id();
+
+	$product_attributes = get_post_meta($parent_product_id, '_product_attributes', true);
+		if (isset($product_attributes['size'])) {
+		// Convert 'size' to taxonomy-based 'pa_size'
+		$product_attributes['pa_size'] = array(
+			'name'         => 'pa_size',
+			'value'        => '', // Leave empty for taxonomy-based attributes
+			'position'     => $product_attributes['size']['position'],
+			'is_visible'   => $product_attributes['size']['is_visible'],
+			'is_variation' => $product_attributes['size']['is_variation'],
+			'is_taxonomy'  => 1, // Set to taxonomy-based
+		);
+
+		// Remove the old custom attribute
+		unset($product_attributes['size']);
+	}
 	$pri_price = $variation_data['regular_price'];
 	//$product_status = get_post_status($parent_product_id);
 	//if ($product_status == 'publish') {
@@ -242,6 +280,22 @@ function simply_ItemsAtrrVariation_func($item)
 	$attributes['size'] = $item['ADVA_PARTQUANT'].' כמוסות';
 	$item['attributes'] = $attributes;
 	return $item;
+}
+
+
+add_filter('simply_request_data_receipt', 'simply_request_data_receipt_func');
+function simply_request_data_receipt_func($data){
+	unset($data['PAYMENTDEF_SUBFORM']);
+	$order_id = $data['orderId'];
+	$order = wc_get_order($order_id);
+	$payaccount = get_post_meta($order_id, 'icredit_ccnum', true);
+	$payaccount = substr($payaccount, -4);
+	$data['TPAYMENT2_SUBFORM'][0]['PAYMENTCODE'] = "40"; 
+	$data['TPAYMENT2_SUBFORM'][0]['payaccount'] = $payaccount;
+	$data['TPAYMENT2_SUBFORM'][0]['QPRICE'] = floatval($order->get_total());
+
+	//$data['STCODE'] = "40";
+	return $data;
 }
 
 ?>

@@ -74,9 +74,10 @@ function syncInventoryPriority()
                 }
                 if ($product->post_type == 'product') {
                     $product->set_stock_status($stock_status);
-                    $product->set_manage_stock(true);
+                    $product->set_manage_stock(false);
+                    $product->save();
                 }
-                $product->save();
+                
             }
         }
         // add timestamp

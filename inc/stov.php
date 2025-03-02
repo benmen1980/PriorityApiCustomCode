@@ -9,7 +9,7 @@ if (!wp_next_scheduled('syncItemsPriority_hook')) {
 
 }
 
-function syncItemsPriority() {
+function syncItemsPriority_old() {
 
     $priority_version = (float) WooAPI::instance()->option( 'priority-version' );
     // config
@@ -48,9 +48,9 @@ function syncItemsPriority() {
 
     if ($response['status']) {
         $response_data = json_decode($response['body_raw'], true);
-		echo "<pre>";
-		print_r($response);
-		echo "</pre>";
+		// echo "<pre>";
+		// print_r($response);
+		// echo "</pre>";
         try {
             foreach ( $response_data['value'] as $item ) {
                 if ( defined( 'WP_DEBUG' ) && true === WP_DEBUG ) {
@@ -494,6 +494,346 @@ function syncItemsPriority() {
 
 }
 
+function syncItemsPriority() {
+    // config
+    $index = 0;
+    $step  = 2;
+    //		$step  = 100;
+            
+        $response_data       = [ 0 ];
+        $raw_option          = str_replace( [
+            "\n",
+            "\t",
+            "\r"
+        ], '', WooAPI::instance()->option( 'sync_items_priority_config' ) );
+        $config              = json_decode( stripslashes( $raw_option ) );
+        $daysback            = ( ! empty( (int) $config->days_back ) ? $config->days_back : 1 );
+        $is_load_image = json_decode( $config->is_load_image );
+        $stamp          = mktime( 0 - $daysback * 24, 0, 0 );
+        $bod            = date( DATE_ATOM, $stamp );
+        $date_filter    = 'UDATE ge ' . urlencode( $bod );
+        $url_addition_config = ( ! empty( $config->additional_url ) ? $config->additional_url : '' );
+        //$log_enable          = WooAPI::instance()->option( 'log_items_priority', true );
+        $total_products = 0;
+        $stats_total    = [];
+        $show_in_web         = ( ! empty( $config->show_in_web ) ? $config->show_in_web : 'SHOWINWEB' );
+        
+        $data_select['select'] = 'PARTNAME,PARTDES,REUT_SUBTITLE,REUT_ISBN,REUT_DANACODE,VATPRICE,BASEPLPRICE,SPEC1,SPEC5,EXTFILENAME,INVFLAG,SHOWINWEB,SERNFLAG';
+        $data_expand['expand'] = '$expand=ECPARTCATEGORIES_SUBFORM($select=ECATCODE,REUT_SUBECATCODE,REUT_SUBSUBCATCODE),REUT_AUTHORS_SUBFORM($select=NAME_AUTH),REUT_TRAN_SUBFORM($select=NAME_TRAN),PARTTEXT_SUBFORM($select=TEXT),REUT_LABELSFORBOOK_SUBFORM($select=REUT_BOOKLABEL),REUT_PUBLISHERS_SUBFORM($select=PUBLISHER)';
+        
+        import_start();
+        $check1 = date('Y-m-d H:i:s');
+        // todo: change this while to proper finish logic
+        while ( sizeof( $response_data ) > 0 ) {
+            //$request = 'LOGPART?$select=' . $data_select['select'] . '&$filter= ISMPART ne \'Y\' and SHOWINWEB eq \'Y\' &$skip=' . $index . '&$top=' . $step . '' . $url_addition_config . '&' . $data_expand['expand'] . '';
+            $request = 'LOGPART?$select=' . $data_select['select'] . '&$filter=' . $date_filter . ' and ISMPART ne \'Y\' &$skip=' . $index . '&$top=' . $step . '' . $url_addition_config . '&' . $data_expand['expand'] . '';
+            //\WP_CLI::log( date_i18n( 'H:i:s' ) . ' - ' . "Sending Request to priority - start at line " . number_format( $index ) . " | batch of " . number_format( $step ) . " products" );
+            $response = WooAPI::instance()->makeRequest( 'GET', $request, [], true );
+            //\WP_CLI::log( date_i18n( 'H:i:s' ) . ' - ' . 'Request finished' );
+            
+            if ( $response['status'] ) {
+                $products      = [];
+                $response_data = json_decode( $response['body_raw'], true )['value'];
+                //\WP_CLI::log( date_i18n( 'H:i:s' ) . ' - ' . count( $response_data['value'] ) . ' Products received, starting sync' );
+                
+                foreach ( $response_data as $item ) {
+                    $sku = trim( $item['PARTNAME'] ?? '' );
+                    if ( ! $sku ) {
+                        continue;
+                    }
+                    // set visibility hidden and continue to next item if showinweb = N
+                    if ( $item[ $show_in_web ] != 'Y' ) {
+                        $pdt_id = wc_get_product_id_by_sku($sku);
+                        if($pdt_id == 0)
+                            continue;
+                        else{
+                            $existing_product = wc_get_product($pdt_id);
+                            //$_product->set_status( 'draft' );
+                            $existing_product->set_catalog_visibility( 'hidden' );
+                            $existing_product->save();
+                            continue;
+                        }
+                    
+                    }
+                    $content = [];
+                    if ( ! empty( $item['PARTTEXT_SUBFORM'] ) ) {
+                        foreach ( $item['PARTTEXT_SUBFORM'] as $text ) {
+                            $clean_text = preg_replace( '/<style>.*?<\/style>/s', '', $text );
+                            $content[]  = html_entity_decode( $clean_text );
+                        }
+                    }
+                    
+                    $product = [
+                        'post_type'    => 'product',
+                        'post_title'   => trim( $item['PARTDES'] ?? '' ),
+                        'post_excerpt' => $item['REUT_SUBTITLE'] ?? '',
+                        'post_content' => ! empty( $content ) ? implode( ' ', $content ) : '',
+                        'post_status'  => 'publish',
+                        'tax_input'    => [
+                            'product_cat' => [],
+                        ],
+                        'meta_input'   => [
+                            '_sku'                   => $sku,
+                            'isbn_product_field'     => $item['REUT_ISBN'],
+                            'danacode_product_field' => $item['REUT_DANACODE'],
+                            '_price'                 => 25.00,
+                            //'_stock_status' => 'instock',
+                        
+                        ],
+                        'attributes'   => [
+                            'הוצאה-לאור'        => $item['SPEC1'],
+                            'שנת-הוצאה'         => $item['SPEC5'],
+                            'book-author'       => array_map( function ( $attribute ) {
+                                return $attribute['NAME_AUTH'];
+                            }, $item['REUT_AUTHORS_SUBFORM'] ),
+                            'product-tag-badge' => array_map( function ( $attribute ) {
+                                return $attribute['REUT_BOOKLABEL'];
+                            }, $item['REUT_LABELSFORBOOK_SUBFORM'] ),
+                        ],
+                        //'image'        => ($is_load_image == true) ? $item['EXTFILENAME'] : ''
+                        'image' =>  ($is_load_image == true) ? "https://www.w3schools.com/tags/img_girl.jpg" : ""
+                    ];
+                    if ( isset( $item['ECPARTCATEGORIES_SUBFORM'] ) ) {
+                        foreach ( $item['ECPARTCATEGORIES_SUBFORM'] as $cats ) {
+                            foreach ( $cats as $v ) {
+                                if ( ! empty( $v ) ) {
+                                    $product['tax_input']['product_cat'][] = $v;
+                                }
+                            }
+                        }
+                    }
+                    
+                    $products[] = $product;
+                }
+                
+                $stats    = [];
+                //$progress = make_progress_bar( 'Syncing products', count( $products ) );
+                if ( ! empty( $products ) ) {
+                    foreach ( $products as $product ) {
+                        $attributes = $product['attributes'];
+                        unset( $product['attributes'] );
+                        
+                        if ( ! $id = wc_get_product_id_by_sku( $product['meta_input']['_sku'] ) ) {
+                            $stats['new'] ++;
+                            $stats_total['new'] ++;
+                            $post_id = wp_insert_post( $product ); //3852
+                            if ( $post_id && ! is_wp_error( $post_id ) ) {
+                                set_product_data( $product, $post_id, $attributes );
+                            }
+                        } else {
+                            $stats['updated'] ++;
+                            $stats_total['updated'] ++;
+                            $product['ID'] = $id;
+                            $post_id       = wp_update_post( $product );
+                            if ( ! is_wp_error( $post_id ) ) {
+                                set_product_data( $product, $post_id, $attributes );
+                            }
+                        }
+                        //$progress->tick( 1, 'sku: ' . $product['meta_input']['_sku'] );
+                    }
+                }
+                //$progress->finish();
+                //\WP_CLI::log( date_i18n( 'H:i:s' ) . ' - ' . 'Batch Completed' );
+                //\WP_CLI::log( 'New products: ' . $stats['new'] ?? '0' );
+                //\WP_CLI::log( 'Updated products: ' . $stats['updated'] ?? '0' );
+                
+                delete_option( "product_cat_children" ); // clear wordpress taxonomy cache
+                
+                $index          += $step;
+                $total_products += $step;
+                //break;
+            } else {
+                //\WP_CLI::error( 'Failed request at skip=' . ( $index ) . ' with error: ' . print_r( $response, 1 ) ); //$response['body'] );
+                break;
+            }
+        }
+        
+
+        import_finish();
+        $check2 = date('Y-m-d H:i:s');
+        
+        // \WP_CLI::log( date_i18n( 'H:i:s' ) . ' - ' . 'Sync Complete =)' );
+        // \WP_CLI::log( $total_products . ' Products in Total.' );
+        // \WP_CLI::log( 'New products: ' . $stats_total['new'] ?? '0' );
+        // \WP_CLI::log( 'Updated products: ' . $stats_total['updated'] ?? '0' );
+        // \WP_CLI::success( 'Finished.' );
+}
+
+function import_start() {
+//		add_filter( 'terms_clauses', function ( $clauses ) {
+//			$clauses['fields'] = 'ids'; // Avoid fetching full term data for each insert
+//
+//			return $clauses;
+//		} );
+    wp_suspend_cache_invalidation( true );
+    wp_defer_term_counting( true );
+    wp_defer_comment_counting( true );
+}
+        
+function import_finish() {
+    wp_suspend_cache_invalidation( false );
+    wp_cache_flush();
+    wp_defer_term_counting( false );
+    wp_defer_comment_counting( false );
+    delete_option( "product_cat_children" );
+    //wp_update_term_count_now(get_terms(['taxonomy' => 'product_cat', 'fields' => 'ids']), 'product_cat'); // Updates counts.
+    wc_update_product_lookup_tables();
+}
+function recursive_add_categories( $categories ) {
+    $category_ids = [];
+    $parent_id    = 0;
+    
+    foreach ( $categories as $category ) {
+        $terms = get_terms( [
+            'taxonomy'   => 'product_cat',
+            'name'       => $category,
+            'parent'     => $parent_id,
+            'hide_empty' => false,
+        ] );
+        //if ( ! $term = term_exists( $category, 'product_cat', (int) $parent_id ) ) {
+        if ( empty( $terms ) ) {
+            
+            $term = wp_insert_term( $category, 'product_cat', [ 'parent' => $parent_id ] );
+            delete_option( "product_cat_children" ); // WTF?!?!?~~~ without this child cat duplicates
+        } else {
+            $term = [ 'term_id' => $terms[0]->term_id ];
+        }
+        if ( ! is_wp_error( $term ) ) {
+            $category_ids[] = $parent_id = (int) $term['term_id'];
+        }
+    }
+    
+    return $category_ids;
+}
+
+function upload_image( $url, $title = null ) {
+    require_once( ABSPATH . "/wp-load.php" );
+    require_once( ABSPATH . "/wp-admin/includes/image.php" );
+    require_once( ABSPATH . "/wp-admin/includes/file.php" );
+    require_once( ABSPATH . "/wp-admin/includes/media.php" );
+    
+    // Download url to a temp file
+    $tmp = download_url( $url );
+    if ( is_wp_error( $tmp ) ) {
+        return false;
+    }
+    
+    // Get the filename and extension ("photo.png" => "photo", "png")
+    $filename  = pathinfo( $url, PATHINFO_FILENAME );
+    $extension = pathinfo( $url, PATHINFO_EXTENSION );
+    
+    // An extension is required or else WordPress will reject the upload
+    if ( ! $extension ) {
+        // Look up mime type, example: "/photo.png" -> "image/png"
+        $mime = mime_content_type( $tmp );
+        $mime = is_string( $mime ) ? sanitize_mime_type( $mime ) : false;
+        
+        // Only allow certain mime types because mime types do not always end in a valid extension (see the .doc example below)
+        $mime_extensions = [
+            'text/plain'         => 'txt',
+            'text/csv'           => 'csv',
+            'application/msword' => 'doc',
+            'image/jpg'          => 'jpg',
+            'image/jpeg'         => 'jpeg',
+            'image/gif'          => 'gif',
+            'image/png'          => 'png',
+            'video/mp4'          => 'mp4',
+        ];
+        
+        if ( isset( $mime_extensions[ $mime ] ) ) {
+            // Use the mapped extension
+            $extension = $mime_extensions[ $mime ];
+        } else {
+            // Could not identify extension
+            @unlink( $tmp );
+            
+            return false;
+        }
+    }
+    
+    
+    // Upload by "sideloading": "the same way as an uploaded file is handled by media_handle_upload"
+    $args = [
+        'name'     => "$filename.$extension",
+        'tmp_name' => $tmp,
+    ];
+    
+    // Do the upload
+    $attachment_id = media_handle_sideload( $args, 0, $title );
+    
+    // Cleanup temp file
+    @unlink( $tmp );
+    
+    // Error uploading
+    if ( is_wp_error( $attachment_id ) ) {
+        return false;
+    }
+    
+    // Success, return attachment ID (int)
+    return (int) $attachment_id;
+}
+function set_product_data( $product, $product_id, $attributes = [] ) {
+    $wc_product = wc_get_product( $product_id );
+    
+    // attributes
+    if ( ! empty( $attributes ) ) {
+        $product_attributes_data = [];
+        foreach ( $attributes as $k => $v ) {
+            $taxonomy = wc_attribute_taxonomy_name( $k );
+            if ( is_array( $v ) ) {
+                foreach ( $v as $vv ) {
+                    $brand_term = get_term_by( 'name', $vv, $taxonomy ) ?: wp_insert_term( $vv, $taxonomy );
+                    wp_set_post_terms( $product_id, $vv, $taxonomy, true );
+                    $product_attributes_data[ $taxonomy ] = [
+                        'name'         => $taxonomy,
+                        'value'        => $vv,
+                        'is_visible'   => '1',
+                        'is_variation' => '0',
+                        'is_taxonomy'  => '1'
+                    ];
+                }
+            } else {
+                $brand_term = get_term_by( 'name', $v, $taxonomy ) ?: wp_insert_term( $v, $taxonomy );
+                wp_set_post_terms( $product_id, $v, $taxonomy, true );
+                $product_attributes_data[ $taxonomy ] = [
+                    'name'         => $taxonomy,
+                    'value'        => $v,
+                    'is_visible'   => '1',
+                    'is_variation' => '0',
+                    'is_taxonomy'  => '1'
+                ];
+            }
+        }
+        $wc_product->update_meta_data( '_product_attributes', $product_attributes_data );
+    }
+    
+    // categories
+    $category_ids = recursive_add_categories( $product['tax_input']['product_cat'] );
+    $wc_product->set_category_ids( $category_ids );
+    
+    // price
+    $wc_product->set_regular_price( $product['meta_input']['_price'] );
+
+    //update from hidden to visible
+    if ( $wc_product->get_catalog_visibility() === 'hidden' ) {
+        // Set visibility to 'visible' (Shop and Search)
+        $wc_product->set_catalog_visibility( 'visible' );
+    }
+    
+    //image
+    if ( WooAPI::instance()->option( 'update_image' ) == true || ! get_the_post_thumbnail_url( $product_id ) ) {
+        if ( $product['image'] ) {
+            if ( $attachment_id = upload_image( $product['image'] ) ) {
+                $wc_product->set_image_id( $attachment_id );
+            }
+        }
+    }
+    
+    
+// save product
+    $wc_product->save();
+}
+
 add_action('syncInventoryPriority_hook', 'syncInventoryPriority');
 
 if (!wp_next_scheduled('syncInventoryPriority_hook')) {
@@ -595,12 +935,25 @@ function simply_func($data){
 
     $order = wc_get_order($order_id);
 
-    $store_switcher = get_post_meta($order_id, 'store_switcher', true);
+    $branch_id = get_post_meta($order_id, 'pickup_branch', true);
+    $branch = get_term($branch_id);
+    $branch_code = $branch->slug;
+
+    $pickup_branch = !empty(get_post_meta($order_id, 'store_switcher', true)) ? get_post_meta($order_id, 'store_switcher', true) : $branch_code;
     $shipping_methods = $order->get_shipping_methods();
 	foreach ($shipping_methods as $shipping_method) {
         if ($shipping_method->get_method_id() === 'local_pickup') {
-            $data['WARHSNAME'] = $store_switcher;
+            $data['WARHSNAME'] = $pickup_branch;
+            $shipping_code = "1";
         }
+        if ($shipping_method->get_method_id() === 'woo-baldarp-pickup') {
+            $shipping_code = "2";
+            $data['REUT_PICKUPPOINT'] = $order->get_meta('cargo_DistributionPointID');
+        }
+        if ($shipping_method->get_method_id() === 'flat_rate') {
+            $shipping_code = "3";
+        }
+        $data['STCODE'] = $shipping_code;
     }
 
     $billing_address_floor = get_post_meta($order_id, '_billing_address_floor', true);
@@ -712,3 +1065,306 @@ function write_custom_log($log_msg)
     // if you don't add `FILE_APPEND`, the file will be erased each time you add a log
     file_put_contents($log_file_data, date('H:i:s') . ' ' . $log_msg . "\n", FILE_APPEND);
 }
+
+
+function makeRequestPhototag($log = true)
+{
+    $raw_option          = str_replace( [
+        "\n",
+        "\t",
+        "\r"
+    ], '', WooAPI::instance()->option( 'sync_items_priority_config' ) );
+    $config              = json_decode( stripslashes( $raw_option ) );
+    $daysback = (!empty((int)$config->images_days_back) ? $config->images_days_back : 1);
+    $datedaysback = date('Y-m-d', strtotime('-'.$daysback.' day'));
+    
+    $dateOneHourAgo = gmdate('Y-m-d\TH:i:s\Z', strtotime('-1 hour')); //2024-12-22T10:19:18Z
+
+    $token            = $config->token;
+    $args = [
+        'headers' => [
+            'Authorization' => 'Bearer ' . $token,
+            'Content-Type'  => 'application/json',
+        ],
+        'timeout'   => 45,
+        'method'    => "GET",
+        'sslverify' => 1
+    ];
+
+    $url = "https://rebook.phototag.app/api/images?after=".$datedaysback."";
+
+    $response = wp_remote_request($url, $args);
+    //$response = $this->makeRequestWithRetry($url, $args);
+
+    $response_code    = wp_remote_retrieve_response_code($response);
+    $response_message = wp_remote_retrieve_response_message($response);
+    $response_body    = wp_remote_retrieve_body($response);
+
+    if ($response_code >= 400) {
+        $response_body = strip_tags($response_body);
+    }
+
+    // decode hebrew
+    //$response_body_decoded = $this->decodeHebrew($response_body);
+
+    // log request
+    if ($log) {
+        $GLOBALS['wpdb']->insert($GLOBALS['wpdb']->prefix . 'p18a_logs', [
+            'blog_id'        => get_current_blog_id(),
+            'timestamp'      => current_time('mysql'),
+            'url'            => $url,
+            'request_method' => "GET",
+            'json_request'   => '',
+            'json_response'  => ($response_body ? $response_body : $response_message.' '.$response_code),
+            'json_status'    => ($response_code >= 200 && $response_code < 300) ? 1 : 0
+        ]);
+    }
+
+    return [ 
+        'url'      => $url,
+        'args'     => $args,
+        'method'   => strtoupper($method),
+        'body'     => $response_body_decoded,
+        'body_raw' => $response_body,
+        'code'     => $response_code,
+        'status'   => ($response_code >= 200 && $response_code < 300) ? 1 : 0,
+        'message'  => ($response_message ? $response_message : $response->get_error_message())
+    ];
+    
+}
+
+
+add_action('syncImagesPhototag_cron_hook', 'syncImagesPhototag');
+
+if (!wp_next_scheduled('syncImagesPhototag_cron_hook')) {
+
+   $res = wp_schedule_event(time(), 'hourly', 'syncImagesPhototag_cron_hook');
+
+}
+
+function syncImagesPhototag(){
+    $raw_option          = str_replace( [
+        "\n",
+        "\t",
+        "\r"
+    ], '', WooAPI::instance()->option( 'sync_items_priority_config' ) );
+    $config              = json_decode( stripslashes( $raw_option ) );
+    $token            = $config->token;
+    $response = makeRequestPhototag(true);
+    $response_data = json_decode($response['body_raw'], true);
+    //$filtered_items = [];
+    //$one_hour_ago = strtotime('-1 hour'); 
+    foreach ($response_data as $item) {
+        // $strtotime_time_created = strtotime($item['timeCreated']);
+        // if ($strtotime_time_created >= $one_hour_ago) {
+        //     $filtered_items[] = $item; // Add the item to the filtered array
+        // }
+        $item_id = $item['id'];
+        //$tag = $item['tags'][0];
+        $tag = "071700250545";
+        $time_created = $item['timeCreated'];
+        $time_updated = $item['timeUpdated'];
+        $url_addition = 'SERNUMBERS?$select=SERNUM,PARTNAME&$filter=SERNUM eq \''.$tag.'\'';
+        $priority_response = WooAPI::instance()->makeRequest('GET', $url_addition, null, true);
+        if($priority_response['code'] == 200){
+            $body_array = json_decode($priority_response['body'],true);
+            if(!empty($body_array['value'])){
+                $sku = $body_array['value'][0]['PARTNAME'];
+                $image_url = "https://rebook.phototag.app/api/images/".$item_id."?token=".$token."";
+
+                $created_day = date('Y-m-d H', strtotime($time_created));
+                $updated_day = date('Y-m-d H', strtotime($time_updated));
+                // Check if the image already exists in the media library
+                $existing_image = get_posts(array(
+                    'post_type'   => 'attachment',
+                    'name'        => sanitize_title($sku), // $image_name is the name of the file without extension
+                    'numberposts' => 1
+                ));
+
+                // Insert image to media only if the image does not exist in media or its updated image
+                if (empty($existing_image) || $created_day !== $updated_day) {
+                    $attachment_id = add_image_to_media_library($image_url, $sku);
+                    if (!is_wp_error($attachment_id)) {
+                        $product_id = wc_get_product_id_by_sku($sku); 
+                        if($product_id){
+                            //delete_post_meta($product_id, '_thumbnail_id');
+                            // Set the new image as the featured image
+                            update_post_meta($product_id, '_thumbnail_id', $attachment_id);
+                            set_post_thumbnail($product_id, $attachment_id);
+                            
+                        }
+                    } else {
+                        $attachment_id = $attachment_id->get_error_message();
+                    }
+                }
+                //check if sku has already image, if yes  skip it
+                //$product_id = wc_get_product_id_by_sku($sku); 
+                // if($product_id){
+                //     $current_thumbnail_id = get_post_thumbnail_id($product_id); 
+                //     $created_day = date('Y-m-d H', strtotime($time_created));
+                //     $updated_day = date('Y-m-d H', strtotime($time_updated));
+                   
+                //     //$image_url = "https://rebook.phototag.app/api/images/".$item_id."?token=".$token."";
+
+                  
+                //     //$success = add_image_to_media_library($image_url, $sku);
+                //     // if (!is_wp_error($attachment_id)) {
+                //     //     // Set the new image as the featured image
+                //     //     set_post_thumbnail($product_id, $attachment_id);
+                //     //     //return "Product image updated successfully!";
+                //     // } else {
+                //     //     $attachment_id = $attachment_id->get_error_message();
+                //     // }
+                //     // If days are different, update the product image
+                //     if (($current_thumbnail_id && $created_day !== $updated_day) || $current_thumbnail_id == 0) {
+                       
+                //         $attachment_id = add_image_to_media_library($image_url, $sku);
+
+                //         if (!is_wp_error($attachment_id)) {
+                //             // Set the new image as the featured image
+                //             set_post_thumbnail($product_id, $attachment_id);
+                //             //return "Product image updated successfully!";
+                //         } else {
+                //             $attachment_id = $attachment_id->get_error_message();
+                //         }
+                //     }
+                // }
+                // else{
+                //     //if product not exist, add image to media without attach to product
+                //     $attachment_id = add_image_to_media_library($image_url, $sku);
+                // }
+            }
+            
+        }
+    }
+    wp_cache_flush();
+}
+
+
+
+
+
+
+
+// add_action('init', function(){
+//     // $order_id = 445542;
+//     // $order = wc_get_order($order_id);
+//     // //$order->get_meta('cargo_DistributionPointID');
+//     // if (isset($_GET['debug_check'])) {
+//     //  $branch_id = get_post_meta($order_id, 'pickup_branch', true);
+// 	//     $branch = get_term($branch_id);
+//     //  $branch_code = $branch->slug;
+//     // }
+// });
+
+function add_image_to_media_library($image_url, $product_sku) {
+    // // Check if the image already exists in the media library
+    // $existing_image = get_posts(array(
+    //     'post_type'   => 'attachment',
+    //     'meta_key'    => '_sku', // Custom meta key to store SKU
+    //     'meta_value'  => $product_sku,
+    //     'numberposts' => 1
+    // ));
+
+    // // If the image already exists, return its ID
+    // if (!empty($existing_image)) {
+    //     return $existing_image[0]->ID;
+    // }
+
+    // Ensure WordPress functions are available
+    if (!function_exists('wp_insert_attachment')) {
+        require_once(ABSPATH . 'wp-admin/includes/image.php');
+        require_once(ABSPATH . 'wp-admin/includes/file.php');
+        require_once(ABSPATH . 'wp-admin/includes/media.php');
+    }
+    if (!function_exists('download_url')) {
+        require_once(ABSPATH . 'wp-admin/includes/file.php');
+    }
+    // Download the image from the URL
+    $temp_file = download_url($image_url);
+
+    // Check for download errors
+    if (is_wp_error($temp_file)) {
+        return $temp_file; // Return error if any
+    }
+
+    // Set the file name using the product SKU and preserve the extension
+    $file_extension = pathinfo($image_url, PATHINFO_EXTENSION);
+    if (empty($file_extension)) {
+        $file_extension = 'jpeg'; // Default to 'jpeg' if no extension is found
+    }
+
+    $file_name = sanitize_file_name($product_sku . '.' . $file_extension); //ORB-5531.jpeg
+
+    // Get the upload directory
+    $upload_dir = wp_upload_dir();
+    $file_path = $upload_dir['path'] . '/' . $file_name; //C:\Users\Elisheva\Desktop\wamp64\www\woocommerce/wp-content/uploads/2024/12/ORB-5531.jpeg
+
+    // Move the downloaded file to the upload directory
+    $move_file = @rename($temp_file, $file_path);
+
+    if (!$move_file) {
+        @unlink($temp_file); // Clean up temporary file
+        return new WP_Error('file_move_error', 'Could not move the downloaded file to the uploads directory.');
+    }
+
+    // Check the file type
+    $file_type = wp_check_filetype($file_name, null);
+
+    if (!$file_type['type']) {
+        $file_type = array(
+            'ext'  => $file_extension,
+            'type' => 'image/jpeg' // Default MIME type
+        );
+    }
+
+    // Prepare attachment data
+    $attachment = array(
+        'guid'           => $upload_dir['url'] . '/' . $file_name,
+        'post_mime_type' => $file_type['type'],
+        'post_title'     => preg_replace('/\.[^.]+$/', '', $file_name),
+        'post_content'   => '',
+        'post_status'    => 'inherit',
+    );
+
+    // Insert the attachment into the media library
+    $attachment_id = wp_insert_attachment($attachment, $file_path); //3910
+
+    if (is_wp_error($attachment_id)) {
+        return $attachment_id; // Return error if insertion fails
+    }
+
+    // Generate attachment metadata
+    require_once(ABSPATH . 'wp-admin/includes/image.php');
+    $attach_data = wp_generate_attachment_metadata($attachment_id, $file_path);
+    wp_update_attachment_metadata($attachment_id, $attach_data);
+
+    // Save the SKU as a custom field for future reference
+    //update_post_meta($attachment_id, '_sku', $product_sku);
+
+    // Set the product's featured image
+    // $product_id = wc_get_product_id_by_sku($product_sku);
+    // if ($product_id) {
+    //     // Set the product's featured image
+    //     set_post_thumbnail($product_id, $attachment_id);
+    //     return true; 
+    // }
+    // return false;
+    return $attachment_id; // Return the attachment ID
+}
+
+
+// // Example usage
+// $image_url = "https://rebook.phototag.app/api/images/6739cfffe1af093392b52cdf?token=1111";
+// $product_sku = "12345SKU";
+
+// $result = add_image_to_media_library($image_url, $product_sku);
+
+// if (is_wp_error($result)) {
+//     echo "Error: " . $result->get_error_message();
+// } else {
+//     echo "Image added to media library with ID: " . $result;
+// }
+
+
+
