@@ -82,7 +82,11 @@ add_action('simply_update_product_data', function($item){
         $depth =  $item['SPEC13'];
         $height =  $item['SPEC11'];
         $weight =  $item['SPEC8'];
-        // $color =  $item['SPEC12'];
+        $color =  $item['ZYOU_SPECEDES15'];
+
+        $colors = array_map('trim', explode(',', $color));
+        update_product_color_attributes($product_id, $colors);
+
         // $series =  $item['SPEC12'];
 
         $product_details_data = [
@@ -173,6 +177,62 @@ add_action('simply_update_product_data', function($item){
         
     }
 });
+
+function update_product_color_attributes( $product_id, $colors ) {
+
+    
+    // Ensure the attribute is registered globally in WooCommerce
+    $attr_slug = 'color'; // Global attribute slug for color
+    $attr_name = 'color';
+
+    // Check if the attribute exists; if not, create it
+    if (!WooAPI::instance()->is_attribute_exists($attr_slug)) {
+        $attribute_id = wc_create_attribute(
+            array(
+                'name'         => $attr_name,
+                'slug'         => $attr_slug,
+                'type'         => 'select',
+                'order_by'     => 'menu_order',
+                'has_archives' => 0,
+            )
+        );
+    }
+
+    $clean_colors = array_map( function ( $color ) {
+        return ucwords( trim( strtolower( $color ) ) ); // הפוך לאות ראשונה גדולה, הסר רווחים
+    }, $colors );
+
+    // Ensure terms exist for each color
+    foreach ( $clean_colors as $color ) {
+        if ( ! term_exists( $color, $attr_slug ) ) {
+            wp_insert_term( $color, $attr_slug );
+        }
+    }
+
+    // Assign the colors to the product
+    wp_set_object_terms( $product_id, $clean_colors, $attr_slug, false );
+
+    // Update the product attributes to link the taxonomy
+    $product_attributes = get_post_meta( $product_id, '_product_attributes', true );
+
+    // Check if the product already has the attribute
+    if ( ! is_array( $product_attributes ) ) {
+        $product_attributes = array();
+    }
+
+    // Add or update the color attribute
+    $product_attributes[ 'pa_' . $attr_slug ] = array(
+        'name'         => 'pa_' . $attr_slug,
+        'value'        => '',
+        'is_visible'   => 1, // Show on product page
+        'is_variation' => 0, // Not used for variations
+        'is_taxonomy'  => 1, // This is a taxonomy
+    );
+
+    // Save the updated attributes
+    update_post_meta( $product_id, '_product_attributes', $product_attributes );
+
+}
 
 //open customer in priority then in register
 add_action( 'template_redirect', 'get_user_details_after_registration');
@@ -279,6 +339,20 @@ function get_user_details_after_registration() {
     }
 }
 
+add_filter('simply_modify_customer_number','simply_modify_customer_number');
+function simply_modify_customer_number($data){  
+    $order = $data['order'];
+    
+    if ($order->get_user_id() != 0) {
+        $cust_number = get_user_meta($order->get_user_id(), 'priority_customer_number', true);
+    }
+    else{
+        $cust_number = WooAPI::instance()->option('walkin_number');
+    }
+    $data['CUSTNAME'] = $cust_number;
+    return $data;
+}
+
 // update data and fields in syncorder to priority
 add_filter('simply_request_data', 'simply_func');
 function simply_func($data)
@@ -293,6 +367,25 @@ function simply_func($data)
 	
 	//Update payment code for the query
     $data['PAYMENTDEF_SUBFORM']['PAYMENTCODE'] = '15';
+
+    $order_id = $data['orderId'];
+    $order = new \WC_Order($order_id);
+
+    //set coupon to vprice instead vatprice
+	$coupon = $order->get_coupon_codes();
+	$items = [];
+    foreach($data['ORDERITEMS_SUBFORM'] as $item ){
+        //coupon
+        if($item['PARTNAME'] == '004' ){
+            if(!empty($coupon) && $item['TQUANT'] == -1){
+                $item['PDES'] = $coupon[0];
+            }
+        }
+        $items[] = $item;
+    }
+    $data['ORDERITEMS_SUBFORM'] = $items;
+
+
     return $data;
 }
 
