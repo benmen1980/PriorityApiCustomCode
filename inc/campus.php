@@ -204,6 +204,7 @@ function simply_after_receipt_func($array)
         } else {
             $msg = "No error message found.";
         }
+		$order = wc_get_order($order_id);
         $order->update_meta_data('priority_recipe_status', $msg);
 		$order->save();
 		//wp_mail('elisheva.g@simplyct.co.il','close receipt', $msg.' error code'.$res['code']);
