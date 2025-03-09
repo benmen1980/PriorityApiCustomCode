@@ -972,7 +972,7 @@ function syncInventoryPriority()
  
  
      
-     $expand = '$expand=PARTBALANCE_SUBFORM($select=WARHSNAME,TBALANCE)';
+     $expand = '$expand=YARD_WARHSBAL_SUBFORM($select=WARHSNAME,TQUANT)';
      
      
      $data['expand'] = $expand;
@@ -1015,10 +1015,10 @@ function syncInventoryPriority()
                  
                  // get the stock by specific warehouse
                  
-                 foreach ($item['PARTBALANCE_SUBFORM'] as $wh_stock) {
+                 foreach ($item['YARD_WARHSBAL_SUBFORM'] as $wh_stock) {
                      $store = $wh_stock['WARHSNAME'];
                      if (function_exists('simplyct_set_stock')) {
-                         simplyct_set_stock( $item[$field], $store, $wh_stock['TBALANCE'] );
+                         simplyct_set_stock( $item[$field], $store, $wh_stock['TQUANT'] );
                      }
                  }
 	             simplyct_set_stock_availability($product_id);

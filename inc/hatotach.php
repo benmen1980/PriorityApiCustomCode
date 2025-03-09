@@ -340,7 +340,7 @@ function syncInventoryPriority()
 
         }
         // add timestamp
-        WooAPI::instance()->updateOption('inventory_priority_update', time());
+        //WooAPI::instance()->updateOption('inventory_priority_update', time());
     } else {
         /**
          * t149
@@ -453,9 +453,20 @@ function simply_after_receipt_func($array)
         } else {
             $msg = "No error message found.";
         }
+        $order = wc_get_order($order_id);
         //wp_mail('elisheva.g@simplyct.co.il','close receipt', $msg.' error code'.$res['code']);
         $order->update_meta_data('priority_recipe_status', $msg);
     }
     curl_close($curl);
 
+}
+
+add_action('custom_change_product_status', 'custom_handle_product_status_change');
+
+function custom_handle_product_status_change($product_id) {
+    wp_update_post(array(
+        'ID'          => $product_id,
+        'post_status' => 'publish'
+    ));
+    wp_cache_flush(); // Clears cache to ensure fresh data
 }
