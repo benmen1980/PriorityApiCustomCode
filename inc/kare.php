@@ -5,45 +5,65 @@ use PriorityWoocommerceAPI\WooAPI;
 // update that the product is always in stock
 function simply_code_after_sync_inventory($product_id, $item){
     // set stock status
-    // $product = wc_get_product($product_id);
-	$stock_status = 'instock';
-    $backorder_status = 'no';
-
-    $kare_stock = intval(get_post_meta($product_id, 'kare_general_stock', true));
-    $stock_available = intval(get_post_meta($product_id, '_stock', true));
-
-    if (($kare_stock <= 0) && ($stock_available <= 0)) {
-        $stock_status = 'outofstock';
-        $backorder_status = 'no';
-    } elseif ($kare_stock > 0 && $stock_available <= 0) {
+    if (!$product_id == 0) {
+        $product = wc_get_product($product_id);
         $stock_status = 'instock';
-        $backorder_status = 'yes';
-    }
+        $backorder_status = 'no';
 
-    update_post_meta($product_id, '_stock_status', $stock_status);
-    update_post_meta($product_id, '_backorders', $backorder_status);
+        $kare_stock = intval(get_post_meta($product_id, 'kare_general_stock', true));
+        $stock_available = intval(get_post_meta($product_id, '_stock', true));
+
+        //Set default menu order
+        $menu_order = 1; // Default: In-stock products
+
+        if (($kare_stock <= 0) && ($stock_available <= 0)) {
+            $stock_status = 'outofstock';
+            $backorder_status = 'no';
+            $menu_order = 3;
+        } elseif ($kare_stock > 0 && $stock_available <= 0) {
+            $stock_status = 'instock';
+            $backorder_status = 'yes';
+            $menu_order = 2;
+        }
+
+        update_post_meta($product_id, '_stock_status', $stock_status);
+        update_post_meta($product_id, '_backorders', $backorder_status);
+
+        $product->set_menu_order($menu_order);
+        $product->save();
+    }
 
 }
 
 function simply_code_after_sync_inventory_by_sku($product_id, $item){
     // set stock status
-    // $product = wc_get_product($product_id);
- 	$stock_status = 'instock';
-    $backorder_status = 'no';
-
-    $kare_stock = intval(get_post_meta($product_id, 'kare_general_stock', true));
-    $stock_available = intval(get_post_meta($product_id, '_stock', true));
-
-    if (($kare_stock <= 0) && ($stock_available <= 0)) {
-        $stock_status = 'outofstock';
-        $backorder_status = 'no';
-    } elseif ($kare_stock > 0 && $stock_available <= 0) {
+    if (!$product_id == 0) {
+        $product = wc_get_product($product_id);
         $stock_status = 'instock';
-        $backorder_status = 'yes';
-    }
+        $backorder_status = 'no';
 
-    update_post_meta($product_id, '_stock_status', $stock_status);
-    update_post_meta($product_id, '_backorders', $backorder_status);
+        $kare_stock = intval(get_post_meta($product_id, 'kare_general_stock', true));
+        $stock_available = intval(get_post_meta($product_id, '_stock', true));
+
+        //Set default menu order
+        $menu_order = 1; // Default: In-stock products
+
+        if (($kare_stock <= 0) && ($stock_available <= 0)) {
+            $stock_status = 'outofstock';
+            $backorder_status = 'no';
+            $menu_order = 3;
+        } elseif ($kare_stock > 0 && $stock_available <= 0) {
+            $stock_status = 'instock';
+            $backorder_status = 'yes';
+            $menu_order = 2;
+        }
+
+        update_post_meta($product_id, '_stock_status', $stock_status);
+        update_post_meta($product_id, '_backorders', $backorder_status);
+
+        $product->set_menu_order($menu_order);
+        $product->save();
+    }
 }
 
 // sync items from priority
@@ -235,8 +255,8 @@ function update_product_color_attributes( $product_id, $colors ) {
 }
 
 //open customer in priority then in register
-add_action( 'template_redirect', 'get_user_details_after_registration');
-function get_user_details_after_registration() {
+//add_action( 'template_redirect', 'get_user_details_after_registration1');
+function get_user_details_after_registration1() {
     if ( is_user_logged_in() && !current_user_can( 'manage_options' )) {
         $id = get_current_user_id();
         if(empty(get_user_meta($id, 'user_reg', true))){
@@ -339,6 +359,129 @@ function get_user_details_after_registration() {
     }
 }
 
+
+add_action('template_redirect', 'schedule_user_registration_check');
+
+function schedule_user_registration_check() {
+    if (current_user_can('manage_options') || is_admin()) {
+        return;
+    }
+
+    $id = get_current_user_id();
+    if (!$id || get_user_meta($id, 'user_reg', true)) {
+        return;
+    }
+
+    // Prevent running the check on every refresh (cache result for 10 min)
+    if (get_transient("user_reg_check_$id")) {
+        return;
+    }
+    set_transient("user_reg_check_$id", true, 10 * MINUTE_IN_SECONDS);
+
+    get_user_details_after_registration($id);
+}
+
+
+function get_user_details_after_registration($id) {
+    if (!$id || get_user_meta($id, 'user_reg', true)) {
+        return;
+    }
+
+    update_user_meta($id, 'user_reg', true);
+
+    $user = get_userdata($id);
+    if (!$user) {
+        return;
+    }
+
+    $meta = get_user_meta($id);
+    $email = strtolower($user->user_email);
+    $phone = isset($meta['billing_phone'][0]) ? $meta['billing_phone'][0] : '';
+
+    // Check for customer by email
+    $url_addition = "CUSTOMERS?\$filter=EMAIL eq '$email'";
+    $response_email = WooAPI::instance()->makeRequest('GET', $url_addition, [], true);
+
+    $custname = null;
+    if ($response_email['code'] == 200) {
+        $body_email = json_decode($response_email['body'])->value;
+        if (empty($body_email) && $phone) {
+            // Check for customer by phone
+            $response_phone = WooAPI::instance()->makeRequest('GET', "CUSTOMERS?\$filter=PHONE eq '$phone'", [], true);
+            if ($response_phone['code'] == 200) {
+                $body_phone = json_decode($response_phone['body'])->value;
+                if (!empty($body_phone)) {
+                    $custname = $body_phone[0]->CUSTNAME;
+                }
+            } else {
+                wp_mail(get_option('admin_email'), 'Error searching customer by phone', $response_phone['body']);
+            }
+        } else {
+            $custname = $body_email[0]->CUSTNAME;
+        }
+    } else {
+        wp_mail(get_option('admin_email'), 'Error searching customer by email', $response_email['body']);
+    }
+
+    // Update user meta with customer name if found
+    if ($custname) {
+        update_user_meta($id, 'priority_customer_number', $custname);
+    }
+
+    // Prepare additional user details
+    $birthday = get_user_meta($id, 'birth_date', true);
+    $gender = get_user_meta($id, 'sex_selection', true);
+    $user_arrived_choice = get_user_meta($id, 'user_arrived_choice', true);
+    $club = get_user_meta($id, 'checkbox_club', true);
+
+    // Format birthday date if available
+    $birthday_date = '';
+    if (!empty($birthday)) {
+        $timezone = new DateTimeZone('Asia/Jerusalem');
+        $date = DateTime::createFromFormat('Y-m-d', $birthday, $timezone);
+        if ($date) {
+            $date->setTime(0, 0, 0);
+            $birthday_date = $date->format('Y-m-d\TH:i:sP');
+        }
+    }
+
+    $request = [
+        'CUSTNAMEPATNAME' => 'DW',
+        'CUSTDES' => isset($meta['first_name'][0]) ? $meta['first_name'][0] . ' ' . $meta['last_name'][0] : $meta['nickname'][0],
+        'EMAIL' => $user->user_email,
+        'ZYOU_BIRTHDATE10' => $birthday_date,
+        'PHONE' => $phone,
+        'NSFLAG' => 'Y',
+        'SPEC4' => $user_arrived_choice ?: '',
+        'CTYPECODE' => $club ? '02' : '03',
+        'SPEC3' => $gender ?: '',
+        'ZYOU_MAILAPP' => $club ? 'Y' : '',
+        'SPEC20' => strval($id),
+        'SPEC19' => 'נרשם באתר'
+    ];
+
+    $method = $custname ? 'PATCH' : 'POST';
+    $url_edition = $custname ? "CUSTOMERS('$custname')" : 'CUSTOMERS';
+
+    if ($method === 'PATCH') {
+        unset($request['CUSTNAMEPATNAME']);
+    }
+
+    $json_request = json_encode($request);
+    $response = WooAPI::instance()->makeRequest($method, $url_edition, ['body' => $json_request], true);
+
+    if (($method === 'POST' && $response['code'] == 201) || ($method === 'PATCH' && $response['code'] == 200)) {
+        $data = json_decode($response['body']);
+        update_user_meta($id, 'priority_customer_number', $data->CUSTNAME);
+    } else {
+        WooAPI::instance()->sendEmailError(
+            [WooAPI::instance()->option('email_error_sync_customers_web')],
+            'Error Sync Customers',
+            $response['body']
+        );
+    }
+}
+
 add_filter('simply_modify_customer_number','simply_modify_customer_number');
 function simply_modify_customer_number($data){  
     $order = $data['order'];
@@ -371,8 +514,34 @@ function simply_func($data)
     $order_id = $data['orderId'];
     $order = new \WC_Order($order_id);
 
-    //set coupon to vprice instead vatprice
 	$coupon = $order->get_coupon_codes();
+
+    if (!empty($coupon)) {
+		// echo "<pre>";
+		// print_r($coupon);
+		// echo "</pre>";
+        //$mappings = get_field('coupon_agent_mappings', 'option');
+		$default_language = apply_filters('wpml_default_language', null);
+		$current_language = apply_filters('wpml_current_language', null);
+
+		if ( $current_language !== $default_language ) {
+			do_action('wpml_switch_language', $default_language);
+		}
+
+		$mappings = get_field('coupon_agent_mappings', 'option');
+
+		if ( $current_language !== $default_language ) {
+			do_action('wpml_switch_language', $current_language);
+		}
+		//print_r( $mappings);
+        if ($mappings) {
+            foreach ($mappings as $mapping) {
+                if (in_array($mapping['coupon_code'], $coupon)) {
+                    $data['AGENTCODE'] = $mapping['agent_name']; // Return the first matched agent name
+                }
+            }
+        }
+    }
 	$items = [];
     foreach($data['ORDERITEMS_SUBFORM'] as $item ){
         //coupon
@@ -406,6 +575,34 @@ function simply_receipt_func($data)
 	
 	//Update payment code for the query
     $data['TPAYMENT2_SUBFORM'][0]['PAYMENTCODE'] = '15';
+
+    $coupon = $order->get_coupon_codes();
+	if (!empty($coupon)) {
+		// echo "<pre>";
+		// print_r($coupon);
+		// echo "</pre>";
+        //$mappings = get_field('coupon_agent_mappings', 'option');
+		$default_language = apply_filters('wpml_default_language', null);
+		$current_language = apply_filters('wpml_current_language', null);
+
+		if ( $current_language !== $default_language ) {
+			do_action('wpml_switch_language', $default_language);
+		}
+
+		$mappings = get_field('coupon_agent_mappings', 'option');
+
+		if ( $current_language !== $default_language ) {
+			do_action('wpml_switch_language', $current_language);
+		}
+		//print_r( $mappings);
+        if ($mappings) {
+            foreach ($mappings as $mapping) {
+                if (in_array($mapping['coupon_code'], $coupon)) {
+                    $data['AGENTCODE'] = $mapping['agent_name']; // Return the first matched agent name
+                }
+            }
+        }
+    }
 
     return $data;
 }

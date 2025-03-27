@@ -298,4 +298,84 @@ function simply_request_data_receipt_func($data){
 	return $data;
 }
 
+//close receipt	
+add_filter('simply_after_post_receipt', 'simply_after_receipt_func');
+function simply_after_receipt_func($array)
+{
+	
+    $receipt_number = $array["IVNUM"]; 
+    $order_id = $array["order_id"];
+  
+    //$username = WooAPI::instance()->option('username');
+	$username = "api";
+    $password = WooAPI::instance()->option('password');
+    $url = 'https://'.WooAPI::instance()->option('url');
+    if( false !== strpos( $url, 'p.priority-connect.online' ) ) {
+        $url = 'https://p.priority-connect.online/wcf/service.svc';
+    }
+    $tabulaini = WooAPI::instance()->option('application');
+    $company = WooAPI::instance()->option('environment');
+    $appid = WooAPI::instance()->option('X-App-Id');
+    $appkey = WooAPI::instance()->option('X-App-Key');
+
+    $data['IVNUM'] = $receipt_number;
+    $data['credentials']['appname'] = 'demo';
+    $data['credentials']['username'] = $username;
+    $data['credentials']['password'] = $password;
+    $data['credentials']['url'] = $url;
+    $data['credentials']['tabulaini'] = $tabulaini;
+    $data['credentials']['language'] = '1';
+    $data['credentials']['profile']['company'] = $company;
+    $data['credentials']['devicename'] = 'roy';
+    $data['credentials']['appid'] = $appid;
+    $data['credentials']['appkey'] = $appkey;
+
+    $curl = curl_init();
+    curl_setopt_array($curl, 
+        array(
+            CURLOPT_URL => 'http://prinodehub1-env.eba-gdu3xtku.us-west-2.elasticbeanstalk.com/closeTinvoices',
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_ENCODING => '',
+            CURLOPT_MAXREDIRS => 10,
+            CURLOPT_TIMEOUT => 0,
+            CURLOPT_FOLLOWLOCATION => true,
+            CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
+            CURLOPT_CUSTOMREQUEST => 'POST',
+            CURLOPT_POSTFIELDS => json_encode($data),
+            CURLOPT_HTTPHEADER => array(
+                'Content-Type: application/json'
+        ),
+    ));
+
+    $response = curl_exec($curl);
+	if ($response === false) {
+    	$error_message = curl_error($curl);
+    	wp_mail('elisheva.g@simplyct.co.il', 'cURL Error', $error_message);
+	} 
+    $response_data = json_decode($response, true);
+    $res = curl_getinfo($curl);
+    if ($res['http_code'] <= 201) {
+        if (isset($response_data['ivnum'])) {
+			$order = wc_get_order($order_id);
+			$order->update_meta_data('priority_recipe_number', $response_data['ivnum']);
+			$order->update_meta_data('priority_recipe_status', 'סגורה');
+			$order->save();
+            //wp_mail('elisheva.g@simplyct.co.il','success close receipt for order'.$order_id, $response_data['ivnum']);
+        }
+    }
+    else{
+        if (isset($response_data['message'])) {
+            $msg = $response_data['message'];
+        } else {
+            $msg = "No error message found.";
+        }
+		$order = wc_get_order($order_id);
+        $order->update_meta_data('priority_recipe_status', $msg);
+		$order->save();
+		wp_mail('elisheva.g@simplyct.co.il','close receipt', $msg.' error code'.$res['code']);
+    }
+    curl_close($curl);
+
+}
+
 ?>

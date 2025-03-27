@@ -592,7 +592,7 @@ function syncItemsPriority() {
                             }, $item['REUT_LABELSFORBOOK_SUBFORM'] ),
                         ],
                         //'image'        => ($is_load_image == true) ? $item['EXTFILENAME'] : ''
-                        'image' =>  ($is_load_image == true) ? "https://www.w3schools.com/tags/img_girl.jpg" : ""
+                        //'image' =>  ($is_load_image == true) ? "https://www.w3schools.com/tags/img_girl.jpg" : ""
                     ];
                     if ( isset( $item['ECPARTCATEGORIES_SUBFORM'] ) ) {
                         foreach ( $item['ECPARTCATEGORIES_SUBFORM'] as $cats ) {
@@ -824,10 +824,19 @@ function set_product_data( $product, $product_id, $attributes = [] ) {
     
     //image
     if ( WooAPI::instance()->option( 'update_image' ) == true || ! get_the_post_thumbnail_url( $product_id ) ) {
-        if ( $product['image'] ) {
-            if ( $attachment_id = upload_image( $product['image'] ) ) {
-                $wc_product->set_image_id( $attachment_id );
-            }
+        //product image not from priority but phototag
+        // if ( $product['image'] ) {
+        //     if ( $attachment_id = upload_image( $product['image'] ) ) {
+        //         $wc_product->set_image_id( $attachment_id );
+        //     }
+        // }
+        $sku = $wc_product->get_sku();
+        //check if the image already in media library - added in phototag sync but not attached because product was not yet created
+        $attachment = get_page_by_title( $sku, OBJECT, 'attachment' );
+        if ( $attachment ) {
+            $attachment_id = $attachment->ID;
+            update_post_meta($product_id, '_thumbnail_id', $attachment_id);
+            set_post_thumbnail($product_id, $attachment_id);
         }
     }
     
@@ -965,7 +974,7 @@ function syncInventoryPriority()
      //evry 30 minutes
 	 $stamp = time() - (30 * 60); 
      $bod = date(DATE_ATOM, $stamp);
-     $query = "WARHSTRANSDATE ge $bod or PURTRANSDATE ge $bod or SALETRANSDATE ge $bod";
+     $query = "WARHSTRANSDATE ge $bod or PURTRANSDATE ge $bod or SALETRANSDATE ge $bod or UDATE ge $bod";
 	 $url_addition = '('. rawurlencode($query) . ')';
      
      $data['select'] = 'PARTNAME';
@@ -1191,7 +1200,7 @@ function makeRequestPhototag($log = true)
         "\r"
     ], '', WooAPI::instance()->option( 'sync_items_priority_config' ) );
     $config              = json_decode( stripslashes( $raw_option ) );
-    $daysback = (!empty((int)$config->images_days_back) ? $config->images_days_back : 1);
+    $daysback = (!empty((int)$config->images_days_back) ? $config->images_days_back : 3);
     $datedaysback = date('Y-m-d', strtotime('-'.$daysback.' day'));
     
     $dateOneHourAgo = gmdate('Y-m-d\TH:i:s\Z', strtotime('-1 hour')); //2024-12-22T10:19:18Z
@@ -1276,8 +1285,8 @@ function syncImagesPhototag(){
         //     $filtered_items[] = $item; // Add the item to the filtered array
         // }
         $item_id = $item['id'];
-        //$tag = $item['tags'][0];
-        $tag = "071700250545";
+        $tag = $item['tags'][0];
+        //$tag = "071700250545";
         $time_created = $item['timeCreated'];
         $time_updated = $item['timeUpdated'];
         $url_addition = 'SERNUMBERS?$select=SERNUM,PARTNAME&$filter=SERNUM eq \''.$tag.'\'';
@@ -1299,7 +1308,9 @@ function syncImagesPhototag(){
 
                 // Insert image to media only if the image does not exist in media or its updated image
                 if (empty($existing_image) || $created_day !== $updated_day) {
+                    write_custom_log('update image for sku: '.$sku);
                     $attachment_id = add_image_to_media_library($image_url, $sku);
+                    write_custom_log('atachement id created: '.$attachment_id);
                     if (!is_wp_error($attachment_id)) {
                         $product_id = wc_get_product_id_by_sku($sku); 
                         if($product_id){
@@ -1307,10 +1318,13 @@ function syncImagesPhototag(){
                             // Set the new image as the featured image
                             update_post_meta($product_id, '_thumbnail_id', $attachment_id);
                             set_post_thumbnail($product_id, $attachment_id);
-                            
+                        }
+                        else{
+                            write_custom_log('product id: '.$product_id.' not exist, iamge only added to media!');
                         }
                     } else {
                         $attachment_id = $attachment_id->get_error_message();
+                        write_custom_log('error adding image in library: '.$attachment_id);
                     }
                 }
                 //check if sku has already image, if yes  skip it
@@ -1349,6 +1363,9 @@ function syncImagesPhototag(){
                 //     //if product not exist, add image to media without attach to product
                 //     $attachment_id = add_image_to_media_library($image_url, $sku);
                 // }
+            }
+            else{
+                write_custom_log('not find priority sku for serial number: '.$tag);
             }
             
         }
@@ -1412,8 +1429,18 @@ function add_image_to_media_library($image_url, $product_sku) {
 
     $file_name = sanitize_file_name($product_sku . '.' . $file_extension); //ORB-5531.jpeg
 
-    // Get the upload directory
+    add_filter('upload_dir', $custom_upload_dir_no_subdirs = function($dirs) {
+        $dirs['subdir'] = '';
+        $dirs['path'] = $dirs['basedir'];
+        $dirs['url'] = $dirs['baseurl'];
+        return $dirs;
+    });
+    
     $upload_dir = wp_upload_dir();
+    
+    remove_filter('upload_dir', $custom_upload_dir_no_subdirs);
+    // Get the upload directory
+    //$upload_dir = wp_upload_dir();
     $file_path = $upload_dir['path'] . '/' . $file_name; //C:\Users\Elisheva\Desktop\wamp64\www\woocommerce/wp-content/uploads/2024/12/ORB-5531.jpeg
 
     // Move the downloaded file to the upload directory
