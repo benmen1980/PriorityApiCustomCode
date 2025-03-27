@@ -493,6 +493,33 @@ function syncCPRofByNumber($sku, $quote_token = null ) {
         if ($response_data['value'][0] > 0) {
             foreach ($response_data['value'] as $item) {
                 $response = CheckExistingProduct($item['CPROFNUM'],  $item);    
+                // ADDED BY ALON
+                $company = $item['CDES'];
+                $contact = $item['NAME'];
+                $date = $item['PDATE'];
+                // END - ADDED BY ALON
+            }
+
+            // ADDED BY ALON
+            if( !empty( $_POST['CPROFNUM']) ) {
+                $date_time = new DateTime($date);
+                $new_date = $date_time->format('d.m.Y');
+
+                $agent_name = get_user_meta(get_current_user_id(), 'agent_name', true);
+
+                $to = 'info@arrowcables.com';
+                // $to = 'margalit.t@simplyct.co.il';
+                $subject = 'לקוח ' . $company . ' פתח הצעת מחיר: ' .  $_POST['CPROFNUM'] . ' באיזור האישי ';
+                $message = '<div style="direction: rtl;">
+                            <br/> תאריך ההצעה: ' . $new_date . '
+                            <br/> שם איש הקשר: ' . $contact . '
+                            <br/> שם סוכן: ' . ($agent_name ?? '') . '
+                            </div>';
+                $headers = array('Content-Type: text/html; charset=UTF-8');
+
+                // Send email
+                $result = wp_mail($to, $subject, $message, $headers); 
+                // END - ADDED BY ALON
             }
         } else {
             exit(json_encode(['status' => 0, 'msg' => 'Error Sync quotes Priority ']));
@@ -1033,19 +1060,56 @@ add_action('simply_open_quote_request', function($quotemun) {
             $date = date( 'd/m/y',strtotime($quote['PDATE']));
             $price = $quote['TOTPRICE'];
         }
+
+        $agent_name = get_user_meta(get_current_user_id(), 'agent_name', true);
+
         $to = 'info@arrowcables.com';
         // $to = 'margalit.t@simplyct.co.il';
         $subject = 'לקוח  ' . $company . ' נכנס להצעת מחיר ' . $quotemun . ' באזור האישי';
         $message = '<div style="direction: rtl;">היי, 
                     <br/> תאריך הצעה: ' . $date . '
                     <br/> סך המחיר: ' . $price . '
-                    <br/> איש קשר: ' . $contact . '. </div>';
+                    <br/> איש קשר: ' . $contact . '
+                    <br/> שם סוכן: ' . ($agent_name ?? '') . ' </div>';
         $headers = array('Content-Type: text/html; charset=UTF-8');
 
         // Send email
         $result = wp_mail($to, $subject, $message, $headers); 
     }
 });
+
+
+// Send email in approve the order
+add_action('simply_approve_order_request', function($ordname) {  
+    $response = WooAPI::instance()->makeRequest('GET',
+    'ORDERS?$filter=ORDNAME eq \'' . $ordname . '\' ', [], true );
+
+    if ($response['status']) {
+        $response_data = json_decode($response['body_raw'], true);
+        foreach($response_data['value'] as $quote) {
+            $company = $quote['CDES'];
+            $contact = $quote['NAME'];
+            $date = date( 'd/m/y',strtotime($quote['CURDATE']));
+            $price = $quote['TOTPRICE'];
+        }
+
+        $agent_name = get_user_meta(get_current_user_id(), 'agent_name', true);
+
+        $to = 'info@arrowcables.com';
+        // $to = 'margalit.t@simplyct.co.il';
+        $subject = 'לקוח  ' . $company . ' לחץ על אישור הזמנה ' . $ordname . ' באזור האישי';
+        $message = '<div style="direction: rtl;">היי, 
+                    <br/> תאריך ההזמנה: ' . $date . '
+                    <br/> סך המחיר: ' . $price . '
+                    <br/> איש קשר: ' . $contact . '
+                    <br/> שם סוכן: ' . ($agent_name ?? '') . ' </div>';
+        $headers = array('Content-Type: text/html; charset=UTF-8');
+
+        // Send email
+        $result = wp_mail($to, $subject, $message, $headers); 
+    }
+});
+
 
 /**
  * sync inventory from priority
