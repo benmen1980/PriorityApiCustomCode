@@ -230,10 +230,30 @@ function simply_change_shipping_method_based_on_cart_total( $rates, $package ) {
         $shipping_cost=0;
     }
     $rates['flat_rate:2'] -> cost = $shipping_cost; // flat_rate:3 is the name of the shipping method
-    $newTax[1] = $shipping_cost * 0.17;
+    $tax_rate_percent = get_standard_tax_rate_percent(); // Returns the tax rate. For example: 18.0
+    $tax_multiplier = $tax_rate_percent / 100; // 0.18
+    $newTax[1] = $shipping_cost * $tax_multiplier;
     $rates['flat_rate:2'] -> set_taxes($newTax);
 
     return $rates;
+}
+
+//Function that returns the tax rate
+function get_standard_tax_rate_percent() {
+    // Gets the main tax rates
+    $tax_classes = WC_Tax::get_tax_classes(); 
+    array_unshift($tax_classes, ''); 
+
+    foreach ($tax_classes as $class) {
+        $rates = WC_Tax::get_rates($class);
+        foreach ($rates as $rate) {
+            if ($rate['label'] === 'מע"מ' && $rate['shipping'] === 'yes') {
+                return floatval($rate['rate']); // ext: 18.0
+            }
+        }
+    }
+
+    return 0; 
 }
 
 add_filter('simply_modify_orderitem','simply_modify_orderitem');
