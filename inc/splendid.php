@@ -111,15 +111,21 @@ function simply_func($data)
     $order = new \WC_Order($ord_id);
     if($data['doctype'] === 'ORDERS') {
         if(isset($data['SHIPTO2_SUBFORM'])) {
-
             $data['SHIPTO2_SUBFORM']['ADDRESS2'] = (!empty($order->get_shipping_address_2()) ? $order->get_shipping_address_2() : $order->get_billing_address_2());
             $data['SHIPTO2_SUBFORM']['ADDRESS3'] = $order->get_meta('_billing_apartment');
             $data['SHIPTO2_SUBFORM']['ADDRESSA'] = $order->get_meta('_billing_code');
         }
+        $data['PAYMENTDEF_SUBFORM']['PAYMENTCODE'] = '10';
+        $data['PAYMENTDEF_SUBFORM']['PAYCODE'] = '01';
     }
     if($data['doctype'] === 'EINVOICES') {
+        $data['IVDATE'] = date('Y-m-d');
         $data['NAME'] = $order->get_billing_first_name() . ' ' . $order->get_billing_last_name();
+        $data['EPAYMENT2_SUBFORM'][0]['PAYMENTCODE'] = '10';
+        $data['EPAYMENT2_SUBFORM'][0]['PAYCODE'] = '01';
+        unset($data['EPAYMENT2_SUBFORM'][0]['FIRSTPAY']);
     }
+
     return $data;
 }
 
@@ -198,11 +204,16 @@ function simply_after_post_otc_func($array)
         if (isset($response_data['ivnum'])) {
             $order = wc_get_order($order_id);
             $order->update_meta_data('priority_invoice_number', $response_data['ivnum']);
-            $order->update_meta_data('priority_invoice_status', 'סגורה');
+            if (substr($response_data['ivnum'], 0, 2) === "OV") { 
+                $msg = 'סגורה';
+            } else if (isset($response_data['message'])) {
+                $msg = $response_data['message'];
+            }
+            $order->update_meta_data('priority_invoice_status', $msg);
 			$order->save(); 
         }
     }
-    else if ( $res['http_code'] == 200 ) {
+    else  {
         if (isset($response_data['message'])) {
             $msg = $response_data['message'];
         } else {
