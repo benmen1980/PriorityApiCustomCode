@@ -216,20 +216,12 @@ function syncPaymentAfterOrder($order_id){
         'RECPAPP' => $order->get_meta('cc_company_approval_num'),
     ];
   
-    // echo "<pre>";
-    // print_r($data);
-    // echo "</pre>";
-    // die();
+
     $response = WooAPI::instance()->makeRequest('PATCH', $url_addition, ['body' => json_encode($data)], true);
     if ($response['code'] <= 201 && $response['code'] >= 200 ) {
         $order->update_meta_data('priority_recipe_status', 'שולם');
         $order->update_meta_data('priority_recipe_number', $order_name);
         $order->save();
-        // WooAPI::instance()->sendEmailError(
-        //     ['elisheva.g@simplyct.co.il',get_bloginfo('admin_email')],
-        //     'enter success payment',
-        //     'payment'.$order_id
-        // );
     }
     else {
         $mes_arr = json_decode($response['body']);
