@@ -59,16 +59,12 @@ function simply_get_customer_info($data){
     return $data;
 }
 
-
-
 // add_filter( 'woocommerce_checkout_get_value','add_comment_checkout_fields',10,2);
 
 // function add_comment_checkout_fields($input, $key ){
 //     $retrive_data = WC()->session->get( 'session_vars' );
 //     $comments = $retrive_data['data']['cprofnum'];
 // }
-
-
 
 add_filter( 'woocommerce_checkout_fields', 'custom_checkout_field' );
 
@@ -229,11 +225,11 @@ function syncPaymentAfterOrder($order_id){
         $order->update_meta_data('priority_recipe_status', 'שולם');
         $order->update_meta_data('priority_recipe_number', $order_name);
         $order->save();
-        WooAPI::instance()->sendEmailError(
-            ['elisheva.g@simplyct.co.il',get_bloginfo('admin_email')],
-            'enter success payment',
-            'payment'.$order_id
-        );
+        // WooAPI::instance()->sendEmailError(
+        //     ['elisheva.g@simplyct.co.il',get_bloginfo('admin_email')],
+        //     'enter success payment',
+        //     'payment'.$order_id
+        // );
     }
     else {
         $mes_arr = json_decode($response['body']);
@@ -308,6 +304,15 @@ add_filter('woocommerce_email_heading_customer_processing_order', function($head
 add_filter( 'woocommerce_order_item_get_formatted_meta_data', function( $formatted_meta, $item ) {
     return array(); // Return an empty array to remove all item meta
 }, 10, 2 );
+
+
+add_filter( 'gettext', 'custom_wc_terms_checkbox_text', 20, 3 );
+function custom_wc_terms_checkbox_text( $translated_text, $text, $domain ) {
+    if ( 'woocommerce' === $domain && 'I have read and agree to the website %s' === $text ) {
+        $translated_text = 'קראתי ואני מסכים/מה ל%s'; // Space after "ל" removed
+    }
+    return $translated_text;
+}
 
 
 
