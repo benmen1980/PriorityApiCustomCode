@@ -260,22 +260,22 @@ function simply_syncItemsPriorityAdapt($item){
             }
             return;
         }
-		 else if($product_id != 0 && $item[ "SHOWINWEB"]  = 'Y'){
-            if (has_post_thumbnail($product_id)) { 
-                $_product->set_status( 'publish' );
-                $_product->save();
-                return;
-            } 
-			$hebrew_product_id = apply_filters('wpml_object_id', $product_id, 'product', true, 'he');
-            if ( $hebrew_product_id && $hebrew_product_id != $product_id ) {
-                $hebrew_product = wc_get_product( $hebrew_product_id );
-                if ( $hebrew_product && $hebrew_product->get_status() !== 'publish' ) {
-                    $hebrew_product->set_status( 'publish' );
-                    $hebrew_product->save();
-                }
-            }
-            return;
-        }
+// 		 else if($product_id != 0 && $item[ "SHOWINWEB"]  = 'Y'){
+//             if (has_post_thumbnail($product_id)) { 
+//                 $_product->set_status( 'publish' );
+//                 $_product->save();
+//                 return;
+//             } 
+// 			$hebrew_product_id = apply_filters('wpml_object_id', $product_id, 'product', true, 'he');
+//             if ( $hebrew_product_id && $hebrew_product_id != $product_id ) {
+//                 $hebrew_product = wc_get_product( $hebrew_product_id );
+//                 if ( $hebrew_product && $hebrew_product->get_status() !== 'publish' ) {
+//                     $hebrew_product->set_status( 'publish' );
+//                     $hebrew_product->save();
+//                 }
+//             }
+//             return;
+//         }
     }
     if ( $product_id != 0 ) {
                         
