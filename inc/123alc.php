@@ -129,37 +129,121 @@ function simply_request_data_func($data)
 }
 
 add_filter('simply_modify_orderitem', 'my_custom_orderitem_modifier');
+// function my_custom_orderitem_modifier($args) {
+//     // Access the data and item from the filter
+//     $data = $args['data'];
+//     $item = $args['item'];
+
+//     $product = $item->get_product();
+//     if ($product) {
+//         $product_sku = $product->get_sku();
+//         $quantity = (int)$item->get_quantity();
+//         $response = WooAPI::instance()->makeRequest('GET', 
+//         'LOGPART?&$filter=PARTNAME eq \'' . $product_sku . '\'', [], 
+//         true);
+
+//         // check response status
+//         if ($response['status']) {
+//             $data_res = json_decode($response['body_raw'], true);
+//             foreach ($data_res['value'] as $item_p) {
+//                 if ( $item_p['OFER_DEPOSIT'] == "Y" ) {
+//                     $deposit_partname = $item_p['OFER_PARTNAME'];
+//                     $deposit_tquant = $item_p['OFER_DEPOSIT_TQUANT'];
+//                     $deposit_cost = $deposit_tquant * 0.3 * $quantity;
+//                 }
+//             }
+//         }
+//         else {
+//             WooAPI::instance()->sendEmailError(
+//                 WooAPI::instance()->option('email_error_sync_inventory_priority'),
+//                 'Error get Item: '.$product_sku.'deposit details from Priority',
+//                 $response['body']
+//             );
+//         }
+//         $price = $data['ORDERITEMS_SUBFORM'][sizeof($data['ORDERITEMS_SUBFORM']) - 1]['VATPRICE'];
+        
+//         $data['ORDERITEMS_SUBFORM'][sizeof($data['ORDERITEMS_SUBFORM']) - 1]['VATPRICE'] = $price - $deposit_cost;
+//         // $data['ORDERITEMS_SUBFORM'][sizeof($data['ORDERITEMS_SUBFORM']) - 1]['VATPRICE'] = round($price - $deposit_cost);
+        
+//         $tomorrow = strtotime('tomorrow');
+//         $data['ORDERITEMS_SUBFORM'][sizeof($data['ORDERITEMS_SUBFORM']) - 1]['DUEDATE'] =  date('Y-m-d', $tomorrow);
+//     }
+//     // Return the modified data
+//     return ['data' => $data, 'item' => $item];
+// }
+
 function my_custom_orderitem_modifier($args) {
-    // Access the data and item from the filter
     $data = $args['data'];
     $item = $args['item'];
-
+    $quantity = (int) $item->get_quantity();
     $product = $item->get_product();
+
     if ($product) {
         $product_sku = $product->get_sku();
+        $deposit_cost = 0;
+        $timeout_error = "cURL error 28: Connection timed out after 10001 milliseconds";
 
-        $response = WooAPI::instance()->makeRequest('GET', 
-        'LOGPART?&$filter=PARTNAME eq \'' . $product_sku . '\'', [], 
-        true);
+        $max_attempts = 3;
+        $attempts = 0;
+        $response = null;
 
-        // check response status
+        do {
+            $response = WooAPI::instance()->makeRequest(
+                'GET',
+                'LOGPART?$filter=PARTNAME eq \'' . $product_sku . '\'',
+                [],
+                true
+            );
+            $attempts++;
+
+            $should_retry = (
+                !$response['status'] &&
+                isset($response['message']) &&
+                $response['message'] === $timeout_error &&
+                $attempts < $max_attempts
+            );
+
+            if ($should_retry) {
+                sleep(1); // optional wait between retries
+            }
+        } while ($should_retry);
+
+        echo '<pre>';
+        print_r($response);
+        echo '</pre>';
+
         if ($response['status']) {
             $data_res = json_decode($response['body_raw'], true);
             foreach ($data_res['value'] as $item_p) {
-                if ( $item_p['OFER_DEPOSIT'] == "Y" ) {
+                if ($item_p['OFER_DEPOSIT'] === "Y") {
                     $deposit_partname = $item_p['OFER_PARTNAME'];
                     $deposit_tquant = $item_p['OFER_DEPOSIT_TQUANT'];
-                    $deposit_cost = $deposit_tquant * 0.3;
+                    $deposit_cost = $deposit_tquant * 0.3 * $quantity;
                 }
             }
+        } else {
+            // Only send email if failed after all retries
+            if (
+                isset($response['message']) &&
+                $response['message'] === $timeout_error &&
+                $attempts === $max_attempts
+            ) {
+                wp_mail(
+                    'elisheva.g@simplyct.co.il',
+                    'Error getting deposit details for item: ' . $product_sku,
+                    "Failed after {$attempts} attempts.\n\nLast error: " . $response['message']
+                );
+            }
         }
-        $price = $data['ORDERITEMS_SUBFORM'][sizeof($data['ORDERITEMS_SUBFORM']) - 1]['VATPRICE'];
-        $data['ORDERITEMS_SUBFORM'][sizeof($data['ORDERITEMS_SUBFORM']) - 1]['VATPRICE'] = $price - $deposit_cost;
-        // $data['ORDERITEMS_SUBFORM'][sizeof($data['ORDERITEMS_SUBFORM']) - 1]['VATPRICE'] = round($price - $deposit_cost);
-        
-        $tomorrow = strtotime('tomorrow');
-        $data['ORDERITEMS_SUBFORM'][sizeof($data['ORDERITEMS_SUBFORM']) - 1]['DUEDATE'] =  date('Y-m-d', $tomorrow);
+
+        // Subtract deposit from VATPRICE
+        $last_index = sizeof($data['ORDERITEMS_SUBFORM']) - 1;
+        $price = $data['ORDERITEMS_SUBFORM'][$last_index]['VATPRICE'];
+        $data['ORDERITEMS_SUBFORM'][$last_index]['VATPRICE'] = $price - $deposit_cost;
+
+        // Set due date to tomorrow
+        $data['ORDERITEMS_SUBFORM'][$last_index]['DUEDATE'] = date('Y-m-d', strtotime('tomorrow'));
     }
-    // Return the modified data
+
     return ['data' => $data, 'item' => $item];
 }

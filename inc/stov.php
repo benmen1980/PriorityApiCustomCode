@@ -527,7 +527,7 @@ function syncItemsPriority() {
         // todo: change this while to proper finish logic
         while ( sizeof( $response_data ) > 0 ) {
             //$request = 'LOGPART?$select=' . $data_select['select'] . '&$filter= ISMPART ne \'Y\' and SHOWINWEB eq \'Y\' &$skip=' . $index . '&$top=' . $step . '' . $url_addition_config . '&' . $data_expand['expand'] . '';
-            $request = 'LOGPART?$select=' . $data_select['select'] . '&$filter=' . $date_filter . ' and ISMPART ne \'Y\' &$skip=' . $index . '&$top=' . $step . '' . $url_addition_config . '&' . $data_expand['expand'] . '';
+            $request = 'LOGPART?$select=' . $data_select['select'] . '&$filter=' . $date_filter . ' and STATDES eq \'מאושר\' and ISMPART ne \'Y\' &$skip=' . $index . '&$top=' . $step . '' . $url_addition_config . '&' . $data_expand['expand'] . '';
             //\WP_CLI::log( date_i18n( 'H:i:s' ) . ' - ' . "Sending Request to priority - start at line " . number_format( $index ) . " | batch of " . number_format( $step ) . " products" );
             $response = WooAPI::instance()->makeRequest( 'GET', $request, [], true );
             //\WP_CLI::log( date_i18n( 'H:i:s' ) . ' - ' . 'Request finished' );
@@ -845,6 +845,105 @@ function set_product_data( $product, $product_id, $attributes = [] ) {
     $wc_product->save();
 }
 
+add_action('syncInventoryPriority_2704_hook', 'syncInventoryPriority2704');
+
+if (!wp_next_scheduled('syncInventoryPriority_2704_hook')) {
+
+   //$res = wp_schedule_event(time(), 'every_five_minutes', 'syncInventoryPriority_hook');
+   wp_schedule_event(time(), 'daily', 'syncInventoryPriority_2704_hook');
+
+}
+
+function syncInventoryPriority2704() {
+	if ( defined( 'WP_CLI' ) && WP_CLI ) {
+		\WP_CLI::log( date_i18n( 'H:i:s' ) . ' - ' . 'Sync Started' );
+		\WP_CLI::log( date_i18n( 'H:i:s' ) . ' - ' . 'Downloading data from priority' );
+	}
+	
+	$index = 0;
+	$step = 2000;
+	
+	$response_data = [ 0 ];
+	
+	$stamp = strtotime('2025-04-27');
+    $bod = date(DATE_ATOM, $stamp);
+
+    //$query        = "WARHSTRANSDATE eq '2025-04-27T00:00:00Z' or PURTRANSDATE eq '2025-04-27T00:00:00Z' or SALETRANSDATE eq '2025-04-27T00:00:00Z' or UDATE ge '2025-04-27T00:00:00Z' ";
+	$query = "WARHSTRANSDATE eq $bod or PURTRANSDATE eq $bod or SALETRANSDATE eq $bod or UDATE eq $bod";
+    $url_addition = '(' . rawurlencode( $query ) . ')';
+	
+	$data['select'] = 'PARTNAME';
+	
+	
+	$expand = '$expand=YARD_WARHSBAL_SUBFORM($select=WARHSNAME,TQUANT,WEBBALANCE)';
+	
+	file_put_contents( dirname( __FILE__ ) . '/$sync-stock-log.txt', date_i18n( 'H:i:s' ) . "\r\n" );
+	
+	$data['expand'] = $expand;
+	while ( sizeof( $response_data ) > 0 ) {
+		//$response = WooAPI::instance()->makeRequest('GET', 'LOGPART?$select='.$data['select'].'&$filter='.$url_addition.' and INVFLAG eq \'Y\' &' . $data['expand'], [], WooAPI::instance()->option('log_inventory_priority', true));
+		$response = WooAPI::instance()->makeRequest( 'GET', 'LOGPART?$select=' . $data['select'] . '&$filter=' . $url_addition . ' and INVFLAG eq \'Y\' &$skip=' . $index . '&$top=' . $step . '&' . $data['expand'], [], true );
+		// check response status
+        echo 'custom sync inventory 27/04/25';
+        echo "<pre>";
+        print_r($response);
+        echo "</pre>";
+        die();
+		if ( $response['status'] ) {
+			if ( defined( 'WP_CLI' ) && WP_CLI ) {
+				$time = time();
+				\WP_CLI::log( date_i18n( 'H:i:s' ) . ' - ' . "Index: $index | Step: $step" );
+			}
+			$response_data = json_decode( $response['body_raw'], true )['value'];
+			foreach ( $response_data as $item ) {
+				// if product exsits, update
+				$field = 'PARTNAME';
+				$product_id = wc_get_product_id_by_sku( $item[ $field ] );
+				
+				//if ($id = wc_get_product_id_by_sku($item['PARTNAME'])) {
+				if ( ! $product_id == 0 ) {
+					// update_post_meta($product_id, '_sku', $item['PARTNAME']);
+					// get the stock by part availability
+					
+					// get the stock by specific warehouse
+					
+					foreach ( $item['YARD_WARHSBAL_SUBFORM'] as $wh_stock ) {
+						$store = $wh_stock['WARHSNAME'];
+						if ( function_exists( 'simplyct_set_stock' ) ) {
+							simplyct_set_stock( $item[ $field ], $store, $wh_stock['WEBBALANCE'] );
+						}
+					}
+					simplyct_set_stock_availability( $product_id );
+				}
+
+	         if ( defined( 'WP_CLI' ) && WP_CLI ) {
+		         \WP_CLI::log( date_i18n( 'H:i:s' ) . ' - ' . " Product Stock Updated - " . get_the_title($product_id) . " ($product_id)" );
+		         file_put_contents( dirname( __FILE__ ) . '/$sync-stock-log.txt', print_r(  date_i18n( 'H:i:s' ) . ' - ' . " Product Stock Updated - " . get_the_title($product_id) . " ($product_id)", true ), FILE_APPEND );
+	         }
+			}
+			
+			if ( defined( 'WP_CLI' ) && WP_CLI ) {
+				$took = date_i18n( 'H:i:s', time() - $time );
+				\WP_CLI::log( 'Batch process time: ' . $took );
+			}
+			
+			$index += $step;
+			// add timestamp
+			//WooAPI::instance()->updateOption('inventory_priority_update', time());
+		} else {
+			/**
+			 * t149
+			 */
+			WooAPI::instance()->sendEmailError(
+				WooAPI::instance()->option( 'email_error_sync_inventory_priority' ),
+				'Error Sync Inventory Priority',
+				$response['body']
+			);
+			break;
+		}
+	}
+}
+
 add_action('syncInventoryPriority_hook', 'syncInventoryPriority');
 
 if (!wp_next_scheduled('syncInventoryPriority_hook')) {
@@ -853,6 +952,7 @@ if (!wp_next_scheduled('syncInventoryPriority_hook')) {
    wp_schedule_event(time(), 'ten_minutes', 'syncInventoryPriority_hook');
 
 }
+
 /**
  * sync inventory from priority
  */
@@ -950,108 +1050,252 @@ if (!wp_next_scheduled('syncInventoryPriority_hook')) {
      }
  }
 
- add_filter('cron_schedules', 'custom_cron_schedules');
 
-function custom_cron_schedules($schedules) {
-    $schedules['ten_minutes'] = array(
-        'interval' => 10 * 60, // 10 minutes in seconds
-        'display'  => __('Every 10 Minutes')
-    );
-    return $schedules;
+if ( ! wp_next_scheduled( 'syncInventoryPriority_hook' ) ) {
+//	$res = wp_schedule_event( time(), 'daily', 'syncInventoryPriority_hook' );
+	$res = wp_schedule_event( time(), 'priority_custom_schedule', 'syncInventoryPriority_hook' );
 }
 
-function syncInventoryPriority()
-{
-    $index = 0;
-    $step  = 2000;
- 
-    $response_data       = [ 0 ];
-     // get the items simply by time stamp of today
-     $daysback_options = explode(',', WooAPI::instance()->option('sync_inventory_warhsname'))[3];
-     //$daysback = intval(!empty($daysback_options) ? $daysback_options : 1); // change days back to get inventory of prev days
-     $daysback = 20;
-	 //$stamp = mktime(1 - ($daysback * 24), 0, 0);
-     //evry 30 minutes
-	 $stamp = time() - (30 * 60); 
-     $bod = date(DATE_ATOM, $stamp);
-     $query = "WARHSTRANSDATE ge $bod or PURTRANSDATE ge $bod or SALETRANSDATE ge $bod or UDATE ge $bod";
-	 $url_addition = '('. rawurlencode($query) . ')';
-     
-     $data['select'] = 'PARTNAME';
- 
- 
-     
-     $expand = '$expand=YARD_WARHSBAL_SUBFORM($select=WARHSNAME,TQUANT)';
-     
-     
-     $data['expand'] = $expand;
-     while ( sizeof( $response_data ) > 0 ) {
-        //     $response = WooAPI::instance()->makeRequest('GET', 'LOGPART?$select='.$data['select'].'&$filter='.$url_addition.' and INVFLAG eq \'Y\' &' . $data['expand'], [], WooAPI::instance()->option('log_inventory_priority', true));
-     $response = WooAPI::instance()->makeRequest('GET', 'LOGPART?$select='.$data['select'].'&$filter='.$url_addition.' and INVFLAG eq \'Y\' &$skip=' . $index . '&$top=' . $step . '&' . $data['expand'], [], true);
-     // check response status
-//      echo 'custom sync inventory';
-//      echo "<pre>";
-//      print_r($response);
-//      echo "</pre>";
-//      die();
-     if ($response['status']) {
-         $response_data = json_decode($response['body_raw'], true)['value'];
-         foreach ($response_data as $item) {
-             // if product exsits, update
-             $field =  'PARTNAME';
-             $args = array(
-                 'post_type' => array('product', 'product_variation'),
-                 'meta_query' => array(
-                     array(
-                         'key' => '_sku',
-                         'value' => $item[$field]
-                     )
-                 )
-             );
-             $my_query = new \WP_Query($args);
-             if ($my_query->have_posts()) {
-                 while ($my_query->have_posts()) {
-                     $my_query->the_post();
-                     $product_id = get_the_ID();
-                 }
-             } else {
-                 $product_id = 0;
-             }
-             //if ($id = wc_get_product_id_by_sku($item['PARTNAME'])) {
-             if (!$product_id == 0) {
-                 // update_post_meta($product_id, '_sku', $item['PARTNAME']);
-                 // get the stock by part availability
-                 
-                 // get the stock by specific warehouse
-                 
-                 foreach ($item['YARD_WARHSBAL_SUBFORM'] as $wh_stock) {
-                     $store = $wh_stock['WARHSNAME'];
-                     if (function_exists('simplyct_set_stock')) {
-                         simplyct_set_stock( $item[$field], $store, $wh_stock['TQUANT'] );
-                     }
-                 }
-	             simplyct_set_stock_availability($product_id);
-       
-          
-    
-             }
-         }
-         $index          += $step;
-         // add timestamp
-         //WooAPI::instance()->updateOption('inventory_priority_update', time());
-     } else {
-         /**
-          * t149
-          */
-         WooAPI::instance()->sendEmailError(
-             WooAPI::instance()->option('email_error_sync_inventory_priority'),
-             'Error Sync Inventory Priority',
-             $response['body']
-         );
-         break;
-     }
-    }
+add_filter( 'cron_schedules', 'custom_cron_schedules' );
+function custom_cron_schedules( $schedules ) {
+	$minutes = stov_get_minutes();
+	$schedules['priority_custom_schedule'] = [
+		'interval' => $minutes * 60,
+		'display'  => sprintf( __( 'Every %d Minutes' ), $minutes ),
+	];
+	
+	return $schedules;
 }
+
+add_action( 'syncInventoryPriority_hook', 'syncInventoryPriority' );
+function syncInventoryPriority() {
+	if ( defined( 'WP_CLI' ) && WP_CLI ) {
+		\WP_CLI::log( date_i18n( 'H:i:s' ) . ' - ' . 'Sync Started' );
+		\WP_CLI::log( date_i18n( 'H:i:s' ) . ' - ' . 'Downloading data from priority' );
+	}
+	
+	$index = 0;
+	$step = 2000;
+	
+	$response_data = [ 0 ];
+	// get the items simply by time stamp of today
+	// $daysback_options = explode(',', WooAPI::instance()->option('sync_inventory_warhsname'))[3];
+	//$daysback = intval(!empty($daysback_options) ? $daysback_options : 1); // change days back to get inventory of prev days
+	
+	// custom code
+	//	$daysback = 100;
+	//	 $stamp = mktime(1 - ($daysback * 24), 0, 0);
+	
+	// sync inventory 30 minutes back
+	date_default_timezone_set( 'Asia/Jerusalem' );
+	
+	// 37 minutes - cron runs every 30 minutes + 5 minutes server cron + 2 minutes safty
+	$server_cron = 5;
+	$minutes = stov_get_minutes() + $server_cron + 2;
+	$stamp = time() - ( $minutes * 60 );
+	
+	//$step = 2000;
+	//$stamp = time() - ( 48 * 60 * 60 );
+	
+	$bod          = date( DATE_ATOM, $stamp );
+	//$query        = "WARHSTRANSDATE ge $bod or PURTRANSDATE ge $bod or SALETRANSDATE ge $bod or UDATE ge $bod";
+	//update 06/05/25 new reut field:
+	$query        = "REUT_INVENTORYDATE ge $bod";
+	$url_addition = '(' . rawurlencode( $query ) . ')';
+	
+	$data['select'] = 'PARTNAME';
+	
+	
+	$expand = '$expand=YARD_WARHSBAL_SUBFORM($select=WARHSNAME,TQUANT,WEBBALANCE)';
+	
+	//file_put_contents( dirname( __FILE__ ) . '/$sync-stock-log.txt', date_i18n( 'H:i:s' ) . "\r\n" );
+	
+	$data['expand'] = $expand;
+	while ( sizeof( $response_data ) > 0 ) {
+		//     $response = WooAPI::instance()->makeRequest('GET', 'LOGPART?$select='.$data['select'].'&$filter='.$url_addition.' and INVFLAG eq \'Y\' &' . $data['expand'], [], WooAPI::instance()->option('log_inventory_priority', true));
+		$response = WooAPI::instance()->makeRequest( 'GET', 'LOGPART?$select=' . $data['select'] . '&$filter=' . $url_addition . ' and INVFLAG eq \'Y\' &$skip=' . $index . '&$top=' . $step . '&' . $data['expand'], [], true );
+		// check response status
+	//      echo 'custom sync inventory';
+	//      echo "<pre>";
+	//      print_r($response);
+	//      echo "</pre>";
+	//      die();
+		if ( $response['status'] ) {
+			if ( defined( 'WP_CLI' ) && WP_CLI ) {
+				$time = time();
+				\WP_CLI::log( date_i18n( 'H:i:s' ) . ' - ' . "Index: $index | Step: $step" );
+			}
+			$response_data = json_decode( $response['body_raw'], true )['value'];
+			foreach ( $response_data as $item ) {
+				// if product exsits, update
+				$field = 'PARTNAME';
+	//             $args = array(
+	//                 'post_type' => array('product', 'product_variation'),
+	//                 'meta_query' => array(
+	//                     array(
+	//                         'key' => '_sku',
+	//                         'value' => $item[$field]
+	//                     )
+	//                 )
+	//             );
+	//             $my_query = new \WP_Query($args);
+	//             if ($my_query->have_posts()) {
+	//                 while ($my_query->have_posts()) {
+	//                     $my_query->the_post();
+	//                     $product_id = get_the_ID();
+	//                 }
+	//             } else {
+	//                 $product_id = 0;
+	//             }
+	//				if ($item[ $field ] != 'NRB-006231') {
+	//					continue;
+	//				}
+				$product_id = wc_get_product_id_by_sku( $item[ $field ] );
+				
+				//if ($id = wc_get_product_id_by_sku($item['PARTNAME'])) {
+				if ( ! $product_id == 0 ) {
+					// update_post_meta($product_id, '_sku', $item['PARTNAME']);
+					// get the stock by part availability
+					
+					// get the stock by specific warehouse
+					
+					$total_stock = 0;
+					foreach ( $item['YARD_WARHSBAL_SUBFORM'] as $wh_stock ) {
+						$store = $wh_stock['WARHSNAME'];
+						if ( function_exists( 'simplyct_set_stock' ) ) {
+							$total_stock += max( (int) $wh_stock['WEBBALANCE'], 0 );
+							simplyct_set_stock( $item[ $field ], $store, $wh_stock['WEBBALANCE'] );
+						}
+					}
+					$product = wc_get_product( $product_id );
+					$product->set_manage_stock( true );
+					$product->set_stock_status(  $total_stock > 0 ? 'instock' : 'outofstock' );
+					$product->set_stock_quantity( $total_stock );
+					$product->save();
+				}
+				
+				if ( defined( 'WP_CLI' ) && WP_CLI ) {
+					\WP_CLI::log( date_i18n( 'H:i:s' ) . ' - ' . " Product Stock Updated - " . get_the_title($product_id) . " ($product_id)" );
+					file_put_contents( dirname( __FILE__ ) . '/$sync-stock-log.txt', print_r(  date_i18n( 'H:i:s' ) . ' - ' . " Product Stock Updated - " . get_the_title($product_id) . " ($product_id)", true ), FILE_APPEND );
+				}
+			}
+			
+			if ( defined( 'WP_CLI' ) && WP_CLI ) {
+				$took = date_i18n( 'H:i:s', time() - $time );
+				\WP_CLI::log( 'Batch process time: ' . $took );
+			}
+			
+			$index += $step;
+			// add timestamp
+			//WooAPI::instance()->updateOption('inventory_priority_update', time());
+		} else {
+			/**
+			 * t149
+			 */
+			WooAPI::instance()->sendEmailError(
+				WooAPI::instance()->option( 'email_error_sync_inventory_priority' ),
+				'Error Sync Inventory Priority',
+				$response['body']
+			);
+			break;
+		}
+	}
+}
+
+add_action( 'syncInventoryPriority_april_hook', 'syncInventoryPriorityApril' );
+function syncInventoryPriorityApril() {
+	if ( defined( 'WP_CLI' ) && WP_CLI ) {
+		\WP_CLI::log( date_i18n( 'H:i:s' ) . ' - ' . 'Sync Started' );
+		\WP_CLI::log( date_i18n( 'H:i:s' ) . ' - ' . 'Downloading data from priority' );
+	}
+	
+	$index = 0;
+	$step = 2000;
+	
+	$response_data = [ 0 ];
+
+	$daysback = 50;
+    $stamp = mktime(1 - ($daysback * 24), 0, 0);
+    $bod = date(DATE_ATOM, $stamp);
+    $url_addition = '('. rawurlencode('WARHSTRANSDATE ge ' . $bod . ' or PURTRANSDATE ge ' . $bod . ' or SALETRANSDATE ge ' . $bod) . ')';
+
+	$data['select'] = 'PARTNAME';
+	$expand = '$expand=YARD_WARHSBAL_SUBFORM($select=WARHSNAME,TQUANT,WEBBALANCE)';
+	
+	//file_put_contents( dirname( __FILE__ ) . '/$sync-stock-log.txt', date_i18n( 'H:i:s' ) . "\r\n" );
+	
+	$data['expand'] = $expand;
+	while ( sizeof( $response_data ) > 0 ) {
+		$response = WooAPI::instance()->makeRequest( 'GET', 'LOGPART?$select=' . $data['select'] . '&$filter=' . $url_addition . ' and INVFLAG eq \'Y\' &$skip=' . $index . '&$top=' . $step . '&' . $data['expand'], [], true );
+		// check response status
+        // echo 'custom sync inventory';
+        // echo "<pre>";
+        // print_r($response);
+        // echo "</pre>";
+        // die();
+		if ( $response['status'] ) {
+			if ( defined( 'WP_CLI' ) && WP_CLI ) {
+				$time = time();
+				\WP_CLI::log( date_i18n( 'H:i:s' ) . ' - ' . "Index: $index | Step: $step" );
+			}
+			$response_data = json_decode( $response['body_raw'], true )['value'];
+			foreach ( $response_data as $item ) {
+				// if product exsits, update
+				$field = 'PARTNAME';
+
+				$product_id = wc_get_product_id_by_sku( $item[ $field ] );
+				
+				//if ($id = wc_get_product_id_by_sku($item['PARTNAME'])) {
+				if ( ! $product_id == 0 ) {
+					// update_post_meta($product_id, '_sku', $item['PARTNAME']);
+					// get the stock by part availability
+					
+					// get the stock by specific warehouse
+					
+					$total_stock = 0;
+					foreach ( $item['YARD_WARHSBAL_SUBFORM'] as $wh_stock ) {
+						$store = $wh_stock['WARHSNAME'];
+						if ( function_exists( 'simplyct_set_stock' ) ) {
+							$total_stock += max( (int) $wh_stock['WEBBALANCE'], 0 );
+							simplyct_set_stock( $item[ $field ], $store, $wh_stock['WEBBALANCE'] );
+						}
+					}
+					$product = wc_get_product( $product_id );
+					$product->set_manage_stock( true );
+					$product->set_stock_status(  $total_stock > 0 ? 'instock' : 'outofstock' );
+					$product->set_stock_quantity( $total_stock );
+					$product->save();
+				}
+				
+				if ( defined( 'WP_CLI' ) && WP_CLI ) {
+					\WP_CLI::log( date_i18n( 'H:i:s' ) . ' - ' . " Product Stock Updated - " . get_the_title($product_id) . " ($product_id)" );
+					file_put_contents( dirname( __FILE__ ) . '/$sync-stock-log.txt', print_r(  date_i18n( 'H:i:s' ) . ' - ' . " Product Stock Updated - " . get_the_title($product_id) . " ($product_id)", true ), FILE_APPEND );
+				}
+			}
+			
+			if ( defined( 'WP_CLI' ) && WP_CLI ) {
+				$took = date_i18n( 'H:i:s', time() - $time );
+				\WP_CLI::log( 'Batch process time: ' . $took );
+			}
+			
+			$index += $step;
+			// add timestamp
+			//WooAPI::instance()->updateOption('inventory_priority_update', time());
+		} else {
+			/**
+			 * t149
+			 */
+			WooAPI::instance()->sendEmailError(
+				WooAPI::instance()->option( 'email_error_sync_inventory_priority' ),
+				'Error Sync Inventory Priority',
+				$response['body']
+			);
+			break;
+		}
+	}
+}
+
+
 
 add_filter('simply_request_data', 'simply_func');
 function simply_func($data){
@@ -1103,6 +1347,19 @@ function simply_func($data){
 	$data['PAYMENTDEF_SUBFORM']['CCUID'] = 'tk578'.$ccuid;
 	//remove confnum
 	unset($data['PAYMENTDEF_SUBFORM']['CONFNUM']);
+
+    $items = [];
+	foreach($data['ORDERITEMS_SUBFORM'] as $item ){
+		//if coupon
+		if($item['PARTNAME'] == '000' ){
+			$vatprice = $item['VATPRICE'];
+			unset($item['VATPRICE']);
+			$item['VPRICE'] =  $vatprice;
+		}
+		
+        $items[] = $item;
+    }
+	$data['ORDERITEMS_SUBFORM'] = $items;
    
     return $data;
 }
@@ -1133,8 +1390,8 @@ function send_custom_webhook( $record, $handler ) {
 		$field_value  = $field['value'];
         //write_custom_log('Field Value: ' . $field_value);
         $field_values[ $field['id'] ] = $field_value;
-        $fname = $field_values['name'];
-        $lname = $field_values['lname'];
+        $fname = $field_values['first_name'];
+        $lname = $field_values['last_name'];
         $email = $field_values['email'];
         $phone = $field_values['phone'];
         $order_id = $field_values['order_id'];
@@ -1258,6 +1515,30 @@ function makeRequestPhototag($log = true)
     
 }
 
+function media_exists_by_meta($sku, $created_day) {
+    $args = [
+        'post_type'      => 'attachment',
+        'posts_per_page' => -1,
+        'post_status'    => 'inherit',
+        'meta_query'     => [
+            [
+                'key'   => '_uploaded_image_sku',
+                'value' => $sku
+            ],
+        ]
+    ];
+
+    $attachments = get_posts($args);
+
+    foreach ($attachments as $attachment) {
+        $stored_created = get_post_meta($attachment->ID, '_uploaded_image_created', true);
+        if ($stored_created === $created_day) {
+            return $attachment;
+        }
+    }
+
+    return false;
+}
 
 add_action('syncImagesPhototag_cron_hook', 'syncImagesPhototag');
 
@@ -1300,16 +1581,17 @@ function syncImagesPhototag(){
                 $created_day = date('Y-m-d H', strtotime($time_created));
                 $updated_day = date('Y-m-d H', strtotime($time_updated));
                 // Check if the image already exists in the media library
-                $existing_image = get_posts(array(
-                    'post_type'   => 'attachment',
-                    'name'        => sanitize_title($sku), // $image_name is the name of the file without extension
-                    'numberposts' => 1
-                ));
-
+                // $existing_image = get_posts(array(
+                //     'post_type'   => 'attachment',
+                //     'name'        => sanitize_title($sku), // $image_name is the name of the file without extension
+                //     'numberposts' => 1
+                // ));
+                $existing_image = media_exists_by_meta($sku, $created_day);
+				write_custom_log( 'check if need update or upload new image for sku: ' . $sku );
                 // Insert image to media only if the image does not exist in media or its updated image
-                if (empty($existing_image) || $created_day !== $updated_day) {
+                if (!$existing_image || $created_day !== $updated_day) {
                     write_custom_log('update image for sku: '.$sku);
-                    $attachment_id = add_image_to_media_library($image_url, $sku);
+                    $attachment_id = add_image_to_media_library( $image_url, $sku, $created_day );
                     write_custom_log('atachement id created: '.$attachment_id);
                     if (!is_wp_error($attachment_id)) {
                         $product_id = wc_get_product_id_by_sku($sku); 
@@ -1370,7 +1652,7 @@ function syncImagesPhototag(){
             
         }
     }
-    wp_cache_flush();
+    //wp_cache_flush();
 }
 
 
@@ -1390,7 +1672,7 @@ function syncImagesPhototag(){
 //     // }
 // });
 
-function add_image_to_media_library($image_url, $product_sku) {
+function add_image_to_media_library($image_url, $product_sku, $created_day) {
     // // Check if the image already exists in the media library
     // $existing_image = get_posts(array(
     //     'post_type'   => 'attachment',
@@ -1429,20 +1711,20 @@ function add_image_to_media_library($image_url, $product_sku) {
 
     $file_name = sanitize_file_name($product_sku . '.' . $file_extension); //ORB-5531.jpeg
 
-    add_filter('upload_dir', $custom_upload_dir_no_subdirs = function($dirs) {
-        $dirs['subdir'] = '';
-        $dirs['path'] = $dirs['basedir'];
-        $dirs['url'] = $dirs['baseurl'];
-        return $dirs;
-    });
+    // add_filter('upload_dir', $custom_upload_dir_no_subdirs = function($dirs) {
+    //     $dirs['subdir'] = '';
+    //     $dirs['path'] = $dirs['basedir'];
+    //     $dirs['url'] = $dirs['baseurl'];
+    //     return $dirs;
+    // });
     
     $upload_dir = wp_upload_dir();
     
-    remove_filter('upload_dir', $custom_upload_dir_no_subdirs);
+    //remove_filter('upload_dir', $custom_upload_dir_no_subdirs);
     // Get the upload directory
     //$upload_dir = wp_upload_dir();
-    $file_path = $upload_dir['path'] . '/' . $file_name; //C:\Users\Elisheva\Desktop\wamp64\www\woocommerce/wp-content/uploads/2024/12/ORB-5531.jpeg
-
+    //$file_path = $upload_dir['path'] . '/' . $file_name; //C:\Users\Elisheva\Desktop\wamp64\www\woocommerce/wp-content/uploads/2024/12/ORB-5531.jpeg
+    $file_path = $upload_dir['basedir'] . '/sipur/' . $file_name;
     // Move the downloaded file to the upload directory
     $move_file = @rename($temp_file, $file_path);
 
@@ -1472,6 +1754,10 @@ function add_image_to_media_library($image_url, $product_sku) {
 
     // Insert the attachment into the media library
     $attachment_id = wp_insert_attachment($attachment, $file_path); //3910
+    // Save metadata to avoid duplicate re-uploads
+	update_post_meta( $attachment_id, '_uploaded_image_sku', $product_sku );
+	update_post_meta( $attachment_id, '_uploaded_image_created', $created_day );
+	write_custom_log("Saved meta: SKU = $product_sku, created = $created_day");
 
     if (is_wp_error($attachment_id)) {
         return $attachment_id; // Return error if insertion fails

@@ -3,50 +3,165 @@ use PriorityWoocommerceAPI\WooAPI;
 
 // sync inventory from priority
 // update that the product is always in stock
-function simply_code_after_sync_inventory($product_id, $item){
-    // set stock status
-    if (!$product_id == 0) {
-        $product = wc_get_product($product_id);
-        $stock_status = 'instock';
-        $backorder_status = 'no';
+// function simply_code_after_sync_inventory($product_id, $item){
+// 	if (!$product_id == 0) {
+		
+// 		// set stock status
+// 		$product = wc_get_product($product_id);
+// 		$stock_status = 'instock';
+// 		$backorder_status = 'no';
 
-        $kare_stock = intval(get_post_meta($product_id, 'kare_general_stock', true));
-        $stock_available = intval(get_post_meta($product_id, '_stock', true));
+// 		$kare_stock = intval(get_post_meta($product_id, 'kare_general_stock', true));
+// 		$stock_available = intval(get_post_meta($product_id, '_stock', true));
 
-        //Set default menu order
-        $menu_order = 1; // Default: In-stock products
+// 		//Set default menu order
+// 		$menu_order = 1; // Default: In-stock products
+        
+// 		if (($kare_stock <= 0) && ($stock_available <= 0)) {
+// 			$stock_status = 'outofstock';
+// 			$backorder_status = 'no';
+// 			$menu_order = 3;
+// 		} elseif ($kare_stock > 0 && $stock_available <= 0) {
+// 			$stock_status = 'instock';
+// 			$backorder_status = 'yes';
+// 			$menu_order = 2;
+// 			if(has_post_thumbnail($product_id) && ($product->get_status() !== 'publish')){
+// 				$product->set_status('publish');
+// 				$product->save();
+// 			}
+// 		}
 
-        if (($kare_stock <= 0) && ($stock_available <= 0)) {
-            $stock_status = 'outofstock';
-            $backorder_status = 'no';
-            $menu_order = 3;
-        } elseif ($kare_stock > 0 && $stock_available <= 0) {
-            $stock_status = 'instock';
-            $backorder_status = 'yes';
-            $menu_order = 2;
-        }
+//         if ($stock_available > 0 && has_post_thumbnail($product_id) && $product->get_status() !== 'publish') {
+// 			$product->set_status('publish');
+// 		}
 
-        update_post_meta($product_id, '_stock_status', $stock_status);
-        update_post_meta($product_id, '_backorders', $backorder_status);
 
-        $product->set_menu_order($menu_order);
-        $product->save();
-    }
+// 		update_post_meta($product_id, '_stock_status', $stock_status);
+// 		update_post_meta($product_id, '_backorders', $backorder_status);
+// 		$product->set_menu_order($menu_order);
+// 		//$shipping_class_slug = $product->get_shipping_class();
+// 		//echo 'pdt_id: '.$product_id.'<br>';
+// 		//echo "Shipping Class Slug before save: " . $shipping_class_slug.'<br>';
+// 		$product->save();
+		
+// 	}
 
+// }
+// 
+function simply_code_after_sync_inventory($product_id, $item) {
+	if (!$product_id == 0) {
+
+		// set stock status
+		$product = wc_get_product($product_id);
+		$stock_status = 'instock';
+		$backorder_status = 'no';
+
+		$kare_stock = intval(get_post_meta($product_id, 'kare_general_stock', true));
+		$stock_available = intval(get_post_meta($product_id, '_stock', true));
+
+		// Determine values for main product
+		$menu_order = 1;
+		if ($kare_stock <= 0 && $stock_available <= 0) {
+			$stock_status = 'outofstock';
+			$backorder_status = 'no';
+			$menu_order = 3;
+		} elseif ($kare_stock > 0 && $stock_available <= 0) {
+			$stock_status = 'instock';
+			$backorder_status = 'yes';
+			$menu_order = 2;
+			if (has_post_thumbnail($product_id) && $product->get_status() !== 'publish') {
+				$product->set_status('publish');
+			}
+		} elseif ($stock_available > 0 && has_post_thumbnail($product_id)) {
+			if ($product->get_status() !== 'publish') {
+				$product->set_status('publish');
+			}
+		}
+
+		update_post_meta($product_id, '_stock_status', $stock_status);
+		update_post_meta($product_id, '_backorders', $backorder_status);
+		$product->set_menu_order($menu_order);
+		$product->save();
+
+		// WPML: Update Hebrew product if different
+		$hebrew_product_id = apply_filters('wpml_object_id', $product_id, 'product', true, 'he');
+		if ($hebrew_product_id && $hebrew_product_id != $product_id) {
+			$hebrew_product = wc_get_product($hebrew_product_id);
+			if ($hebrew_product) {
+				$hebrew_stock_available = intval(get_post_meta($hebrew_product_id, '_stock', true));
+				if ($hebrew_stock_available != $stock_available) {
+					update_post_meta($hebrew_product_id, '_stock', $stock_available);
+				}
+				update_post_meta($hebrew_product_id, '_stock_status', $stock_status);
+				update_post_meta($hebrew_product_id, '_backorders', $backorder_status);
+				update_post_meta($hebrew_product_id, '_manage_stock', 'yes');
+				$hebrew_product->set_menu_order($menu_order);
+
+				// Optionally publish if same conditions are met
+				if (
+					$stock_status === 'instock' &&
+					has_post_thumbnail($hebrew_product_id) &&
+					$hebrew_product->get_status() !== 'publish'
+				) {
+					$hebrew_product->set_status('publish');
+				}
+
+				$hebrew_product->save();
+			}
+		}
+	}
 }
 
+// function simply_code_after_sync_inventory_by_sku($product_id, $item){
+//     // set stock status
+//     if (!$product_id == 0) {
+// 		$product = wc_get_product($product_id);
+// 		$stock_status = 'instock';
+// 		$backorder_status = 'no';
+
+// 		//Set default menu order
+// 		$menu_order = 1; // Default: In-stock products
+
+// 		$kare_stock = intval(get_post_meta($product_id, 'kare_general_stock', true));
+// 		$stock_available = intval(get_post_meta($product_id, '_stock', true));
+// 		$kare_date_available = get_post_meta($product_id, 'available_ex_muc', true);
+//         //echo 'stock choul'.$kare_stock;
+//         //echo 'stcok israel'.$stock_available;
+// 		if (($kare_stock <= 0) && ($stock_available <= 0)) {
+// 			$stock_status = 'outofstock';
+// 			$backorder_status = 'no';
+// 			$menu_order = 3;
+// 		} elseif ($kare_stock > 0 && $stock_available <= 0) {
+// 			$stock_status = 'instock';
+// 			$backorder_status = 'yes';
+// 			$menu_order = 2;
+// 			if(has_post_thumbnail($product_id) && ($product->get_status() !== 'publish')){
+// 				$product->set_status('publish');
+// 				$product->save();
+// 			}
+// 		}
+
+// 		update_post_meta($product_id, '_stock_status', $stock_status);
+// 		update_post_meta($product_id, '_backorders', $backorder_status);
+
+// 		$product->set_menu_order($menu_order);
+//         //echo 'menu order for sku 57360'.$product->get_menu_order();
+// 		$product->save();
+//         //echo 'menu order for sku 57360'.$product->get_menu_order();
+// 	}
+// }
+
+
 function simply_code_after_sync_inventory_by_sku($product_id, $item){
-    // set stock status
     if (!$product_id == 0) {
         $product = wc_get_product($product_id);
         $stock_status = 'instock';
         $backorder_status = 'no';
+        $menu_order = 1;
 
         $kare_stock = intval(get_post_meta($product_id, 'kare_general_stock', true));
         $stock_available = intval(get_post_meta($product_id, '_stock', true));
-
-        //Set default menu order
-        $menu_order = 1; // Default: In-stock products
+        $kare_date_available = get_post_meta($product_id, 'available_ex_muc', true);
 
         if (($kare_stock <= 0) && ($stock_available <= 0)) {
             $stock_status = 'outofstock';
@@ -56,14 +171,268 @@ function simply_code_after_sync_inventory_by_sku($product_id, $item){
             $stock_status = 'instock';
             $backorder_status = 'yes';
             $menu_order = 2;
+            if (has_post_thumbnail($product_id) && ($product->get_status() !== 'publish')) {
+                $product->set_status('publish');
+            }
         }
 
         update_post_meta($product_id, '_stock_status', $stock_status);
         update_post_meta($product_id, '_backorders', $backorder_status);
-
         $product->set_menu_order($menu_order);
         $product->save();
+
+        // Update Hebrew translation
+        $hebrew_product_id = apply_filters('wpml_object_id', $product_id, 'product', true, 'he');
+        if ($hebrew_product_id && $hebrew_product_id != $product_id) {
+            $hebrew_product = wc_get_product($hebrew_product_id);
+            if ($hebrew_product) {
+                // Sync _stock if needed
+                $hebrew_stock_available = intval(get_post_meta($hebrew_product_id, '_stock', true));
+                if ($hebrew_stock_available != $stock_available) {
+                    update_post_meta($hebrew_product_id, '_stock', $stock_available);
+                }
+
+                // Sync other fields
+                update_post_meta($hebrew_product_id, '_stock_status', $stock_status);
+                update_post_meta($hebrew_product_id, '_backorders', $backorder_status);
+				update_post_meta($hebrew_product_id, '_manage_stock', 'yes');
+                $hebrew_product->set_menu_order($menu_order);
+
+                if (
+                    $stock_status === 'instock' &&
+                    has_post_thumbnail($hebrew_product_id) &&
+                    $hebrew_product->get_status() !== 'publish'
+                ) {
+                    $hebrew_product->set_status('publish');
+                }
+
+                $hebrew_product->save();
+            }
+        }
     }
+}
+
+function simply_syncItemsPriorityAdapt($item){
+    $priority_version = (float) WooAPI::instance()->option( 'priority-version' );
+    // config
+    $raw_option     = WooAPI::instance()->option( 'sync_items_priority_config' );
+    $raw_option     = str_replace( array( "\n", "\t", "\r" ), '', $raw_option );
+    $config         = json_decode( stripslashes( $raw_option ) );
+
+    $daysback            = ( ! empty( (int) $config->days_back ) ? $config->days_back : 1 );
+    $stamp          = mktime( 0 - $daysback * 24, 0, 0 );
+    $bod            = date( DATE_ATOM, $stamp );
+    $date_filter    = 'UDATE ge ' . urlencode( $bod );
+    $url_addition_config = ( ! empty( $config->additional_url ) ? $config->additional_url : '' );
+    $search_field        = ( ! empty( $config->search_by ) ? $config->search_by : 'PARTNAME' );
+    $search_field_web    = ( ! empty( $config->search_field_web ) ? $config->search_field_web : '_sku' );
+    $stock_status        = ( ! empty( $config->stock_status ) ? $config->stock_status : 'outofstock' );
+    $is_categories       = ( ! empty( $config->categories ) ? $config->categories : null );
+    $is_attrs            = ( ! empty( $config->attrs ) ? $config->attrs : false );
+    $is_update_products  = ( ! empty( $config->is_update_products ) ? $config->is_update_products : false );
+    $show_in_web         = ( ! empty( $config->show_in_web ) ? $config->show_in_web : 'SHOWINWEB' );
+    $product_id = wc_get_product_id_by_sku( $item["PARTNAME"] );
+
+    if ( $product_id ) {
+        $post_status = get_post_status( $product_id );
+        if ( in_array( $post_status, array( 'publish', 'draft' ), true ) ) {
+            $_product = wc_get_product( $product_id );
+        } else {
+            $product_id = 0; // Ignore products not in publish/draft
+        }
+    }
+    if ( isset( $show_in_web ) ) {
+        if ( $product_id == 0 && $item[ "SHOWINWEB"]  != 'Y' ) {
+            return;
+        }
+        if ( $product_id != 0 && $item[ "SHOWINWEB"]  != 'Y' ) {
+            $_product->set_status( 'draft' );
+            $_product->save();
+
+            // ✅ Also set Hebrew translation to draft manually
+            $hebrew_product_id = apply_filters('wpml_object_id', $product_id, 'product', true, 'he');
+            if ( $hebrew_product_id && $hebrew_product_id != $product_id ) {
+                $hebrew_product = wc_get_product( $hebrew_product_id );
+                if ( $hebrew_product && $hebrew_product->get_status() !== 'draft' ) {
+                    $hebrew_product->set_status( 'draft' );
+                    $hebrew_product->save();
+                }
+            }
+            return;
+        }
+		 else if($product_id != 0 && $item[ "SHOWINWEB"]  = 'Y'){
+            if (has_post_thumbnail($product_id)) { 
+                $_product->set_status( 'publish' );
+                $_product->save();
+                return;
+            } 
+			$hebrew_product_id = apply_filters('wpml_object_id', $product_id, 'product', true, 'he');
+            if ( $hebrew_product_id && $hebrew_product_id != $product_id ) {
+                $hebrew_product = wc_get_product( $hebrew_product_id );
+                if ( $hebrew_product && $hebrew_product->get_status() !== 'publish' ) {
+                    $hebrew_product->set_status( 'publish' );
+                    $hebrew_product->save();
+                }
+            }
+            return;
+        }
+    }
+    if ( $product_id != 0 ) {
+                        
+        //$_product->set_status(WooAPI::instance()->option('item_status'));
+        //$_product->save();
+        $id = $product_id;
+        global $wpdb;
+        $wpdb->query(
+            $wpdb->prepare(
+                "
+                UPDATE $wpdb->posts
+                SET post_title = '%s'
+                WHERE ID = '%s'
+                ",
+                $item['PARTDES'],
+                $id
+            )
+        );
+        
+    }
+    else {
+        // Insert product
+        $data = [
+            'post_author' => 1,
+            //'post_content' =>  $content,
+            'post_status' => WooAPI::instance()->option( 'item_status' ),
+            'post_title'  => $item['PARTDES'],
+            'post_parent' => '',
+            'post_type'   => 'product',
+        ];
+        $id = wp_insert_post( $data );
+        if ( $id ) {
+            update_post_meta( $id, '_sku', "PARTNAME" );
+            update_post_meta( $id, '_stock_status', $stock_status );
+            if ( $stock_status == 'outofstock' ) {
+                update_post_meta( $id, '_stock', 0 );
+                wp_set_post_terms( $id, 'outofstock', 'product_visibility', true );
+            }
+            if ( ! empty( $item['INVFLAG'] ) ) {
+                update_post_meta( $id, '_manage_stock', ( $item['INVFLAG'] == 'Y' ) ? 'yes' : 'no' );
+            }
+        }
+    }
+    $set_tax = get_option('woocommerce_calc_taxes');
+    $pri_price = (wc_prices_include_tax() == true || $set_tax == 'no') ? $item['VATPRICE'] : $item['BASEPLPRICE'];
+    $my_product = new \WC_Product( $id );
+    $my_product->set_regular_price( $pri_price );
+    if ( $product_price_sale != null && ! empty( $item[ $product_price_sale ] ) ) {
+        $price_sale = $item[ $product_price_sale ];
+        if ( $price_sale != 0 ) {
+            $my_product->set_sale_price( $price_sale );
+        }
+    }
+    if ( ! empty( $my_product->get_meta_data( 'family_code', true ) ) ) {
+        $my_product->update_meta_data( 'family_code', $item['FAMILYNAME'] );
+    } else {
+        $my_product->add_meta_data( 'family_code', $item['FAMILYNAME'] );
+    }
+    $my_product->save();
+    $taxon = 'product_cat';
+    if ( ! empty( $config->parent_category ) || ! empty( $is_categories ) ) {
+        $terms = get_the_terms( $id, $taxon );
+        foreach ( $terms as $term ) {
+            wp_remove_object_terms( $id, $term->term_id, $taxon );
+        }
+    }
+    if ( ! empty( $config->parent_category ) ) {
+        $parent_category = wp_set_object_terms( $id, $item[ $config->parent_category ], $taxon, true );
+    }
+    if ( ! empty( $is_categories ) ) {
+        // update categories
+        $categories = [];
+        foreach ( explode( ',', $config->categories ) as $cat ) {
+            if ( ! empty( $item[ $cat ] ) ) {
+                array_push( $categories, $item[ $cat ] );
+            }
+        }
+		if ( ! empty( $categories ) ) {
+			$d           = 0;
+			$terms       = $categories;
+			$taxon       = 'product_cat'; // or your custom taxonomy
+			$current_lang = apply_filters( 'wpml_current_language', NULL );
+			$default_lang = apply_filters( 'wpml_default_language', NULL );
+
+			// Switch to default language (English)
+			if ( $current_lang !== $default_lang ) {
+				do_action( 'wpml_switch_language', $default_lang );
+			}
+
+			// Make sure parent category is in English
+			if ( ! empty( $config->parent_category ) && $parent_category[0] > 0 ) {
+				$parent_cat_id_en = $parent_category[0];
+
+				// Check if term exists under parent (in English)
+				$term_exists = term_exists( $terms[0], $taxon, $parent_cat_id_en );
+
+				// Get all children of parent
+				$childs = get_term_children( $parent_cat_id_en, $taxon );
+
+				if ( ! empty( $childs ) ) {
+					foreach ( $childs as $child ) {
+						$cat_c = get_term_by( 'id', $child, $taxon, 'ARRAY_A' );
+
+						if ( $cat_c && html_entity_decode( $cat_c['name'] ) === $terms[0] ) {
+							$english_term_id = $child;
+							$d = 1;
+							break;
+						}
+					}
+				}
+
+				// Insert new term under parent (in English)
+				if ( empty( $term_exists ) && $d === 0 ) {
+					$inserted_term = wp_insert_term( $terms[0], $taxon, array( 'parent' => $parent_cat_id_en ) );
+
+					if ( ! is_wp_error( $inserted_term ) ) {
+						$english_term_id = $inserted_term['term_id'];
+						$d = 1;
+					}
+				}
+			}
+
+			// Switch back to original language (e.g., Hebrew)
+			if ( $current_lang !== $default_lang ) {
+				do_action( 'wpml_switch_language', $current_lang );
+			}
+
+			// Assign translated term to product
+			if ( isset( $english_term_id ) ) {
+				$translated_term_id = function_exists('icl_object_id') 
+					? icl_object_id( $english_term_id, $taxon, true, $current_lang ) 
+					: $english_term_id;
+
+				if ( $translated_term_id && ! is_wp_error( $translated_term_id ) ) {
+					wp_set_object_terms( $id, $translated_term_id, $taxon, true );
+				}
+			} else {
+				// No parent category – just assign base category
+				$term_name = $terms[0];
+				$term = get_term_by( 'name', $term_name, $taxon );
+
+				if ( $term ) {
+					$translated_term_id = function_exists('icl_object_id') 
+						? icl_object_id( $term->term_id, $taxon, true, $current_lang ) 
+						: $term->term_id;
+
+					if ( $translated_term_id ) {
+						wp_set_object_terms( $id, $translated_term_id, $taxon, true );
+					}
+				}
+			}
+		}
+
+    }
+    $item['product_id'] = $id;
+    do_action( 'simply_update_product_data', $item );
+    return;
 }
 
 // sync items from priority
@@ -71,10 +440,87 @@ function simply_code_after_sync_inventory_by_sku($product_id, $item){
 add_filter('simply_syncItemsPriority_data', 'simply_syncItemsPriority_data_func');
 function simply_syncItemsPriority_data_func($data)
 {
-    $data['select'] .= ',SUPNAME,SUPDES,ZYOU_LONGFAMILYDES,ZYOU_MFAMILYDES,ZYOU_FAMILYDES';
+    $data['select'] .= ',SUPNAME,SUPDES,ZYOU_LONGFAMILYDES,ZYOU_MFAMILYDES,ZYOU_FAMILYDES,ZYOU_SPECEDES15';
     return $data;
 }
 
+function update_product_color_attributes( $product_id, $colors ) {
+
+
+    // Check if the attribute exists; if not, create it
+    $attr_slug = 'color'; // Global attribute slug for color
+    $attr_taxonomy = 'pa_' . $attr_slug; // WooCommerce expects 'pa_' prefix
+
+    // Ensure the attribute exists in WooCommerce
+    if ( class_exists('WooAPI') && method_exists(WooAPI::instance(), 'is_attribute_exists') ) {
+        if ( ! WooAPI::instance()->is_attribute_exists($attr_slug) ) {
+            wc_create_attribute(
+                array(
+                    'name'         => $attr_slug,
+                    'slug'         => $attr_slug,
+                    'type'         => 'select',
+                    'order_by'     => 'menu_order',
+                    'has_archives' => 0,
+                )
+            );
+        }
+    }
+
+    // Sanitize color names (capitalize first letter, trim spaces)
+    $clean_colors = array_map( function ( $color ) {
+        return ucwords( trim( strtolower( $color ) ) );
+    }, $colors );
+
+    // Ensure terms exist for each color
+    foreach ( $clean_colors as $color ) {
+        if ( ! term_exists( $color, $attr_taxonomy ) ) {
+            wp_insert_term( $color, $attr_taxonomy );
+        }
+    }
+
+    // Assign colors to the product
+    wp_set_object_terms( $product_id, $clean_colors, $attr_taxonomy, false );
+
+    // Retrieve existing attributes
+    $product_attributes = get_post_meta( $product_id, '_product_attributes', true );
+
+    if ( ! is_array( $product_attributes ) ) {
+        $product_attributes = array();
+    }
+
+    // Add or update the color attribute in product attributes
+    $product_attributes[ $attr_taxonomy ] = array(
+        'name'         => $attr_taxonomy,
+        'value'        => '',
+        'is_visible'   => 1, // Show on product page
+        'is_variation' => 0, // Not used for variations
+        'is_taxonomy'  => 1, // This is a taxonomy attribute
+    );
+
+    // Save updated product attributes
+    update_post_meta( $product_id, '_product_attributes', $product_attributes );
+
+    // Ensure WPML compatibility (get translated attributes)
+    if ( function_exists('icl_object_id') ) {
+        $current_lang = apply_filters('wpml_current_language', NULL);
+        $translated_colors = [];
+
+        foreach ($clean_colors as $color) {
+            $translated_color_id = icl_object_id( term_exists($color, $attr_taxonomy)['term_id'], $attr_taxonomy, true, $current_lang );
+            if ($translated_color_id) {
+                $translated_color = get_term($translated_color_id, $attr_taxonomy);
+                if ($translated_color) {
+                    $translated_colors[] = $translated_color->name;
+                }
+            }
+        }
+
+        // Assign translated colors if available
+        if (!empty($translated_colors)) {
+            wp_set_object_terms($product_id, $translated_colors, $attr_taxonomy, false);
+        }
+    }
+}
 add_action('simply_update_product_data', function($item){
 
     $product_id = $item['product_id'];
@@ -103,11 +549,10 @@ add_action('simply_update_product_data', function($item){
         $height =  $item['SPEC11'];
         $weight =  $item['SPEC8'];
         $color =  $item['ZYOU_SPECEDES15'];
+        // $series =  $item['SPEC12'];
 
         $colors = array_map('trim', explode(',', $color));
         update_product_color_attributes($product_id, $colors);
-
-        // $series =  $item['SPEC12'];
 
         $product_details_data = [
             'pdt_information' => [
@@ -116,6 +561,7 @@ add_action('simply_update_product_data', function($item){
                 'depth' => $depth,
                 'height' => $height,
                 'weight' => $weight,
+                'color' => $color
             ],
         ];
         update_field('product_details', $product_details_data, $product_id);
@@ -126,38 +572,83 @@ add_action('simply_update_product_data', function($item){
         update_post_meta($product_id, 'quantity_product_order', $qty_product_order);
 
         //update size ship
-        $shipping_size =  $item['SPEC5'];
+        $shipping_size =  strtolower($item['SPEC5']);
         // simply_set_ship_class($product_id, $shipping_size);
         $shipping_classes = get_terms(array('taxonomy' => 'product_shipping_class', 'hide_empty' => false));
         foreach ($shipping_classes as $shipping_class) {
-            if (strcasecmp($shipping_size, $shipping_class->name) == 0) {
+            //if (strcasecmp($shipping_size, $shipping_class->slug) == 0) {
+            if (strcasecmp(trim($shipping_size), trim($shipping_class->slug)) == 0){
                 // assign class to product
                 $product = wc_get_product($product_id); // Get an instance of the WC_Product Object
                 $product->set_shipping_class_id($shipping_class->term_id); // Set the shipping class ID
                 $product->save(); // Save the product data to database
                 continue;
             }
+		
+			
         }
         
         //update main parent category
-        $taxon = 'product_cat';
-        $main_parent_category_name = $item['ZYOU_FAMILYDES']; //FURNITURE
-        $parent_category_name = $item['ZYOU_MFAMILYDES']; //Tables
+//         $taxon = 'product_cat';
+//         $main_parent_category_name = $item['ZYOU_FAMILYDES']; //FURNITURE
+//         $parent_category_name = $item['ZYOU_MFAMILYDES']; //Tables
 
-        $main_parent_category = term_exists( $main_parent_category_name, $taxon );
-        if ( ! $main_parent_category ) {
-            $main_parent_category = wp_insert_term( $main_parent_category_name, $taxon );
-        }
+//         $main_parent_category = term_exists( $main_parent_category_name, $taxon );
+//         if ( ! $main_parent_category ) {
+//             $main_parent_category = wp_insert_term( $main_parent_category_name, $taxon );
+//         }
 
-        if ( ! is_wp_error( $main_parent_category ) && ! empty( $main_parent_category['term_id'] ) ) {
-            $parent_category = term_exists( $parent_category_name, $taxon );
-            // $child_category = term_exists( $parent_category_name, $taxon, $main_parent_category['term_id'] );
-            if ( ! empty( $parent_category ) && ! is_wp_error( $parent_category )) {
-                // wp_insert_term( $parent_category, $taxon, array( 'parent' => $main_parent_category['term_id'] ) );
-                wp_update_term( $parent_category['term_id'], $taxon, array( 'parent' => $main_parent_category['term_id'] ) );
-            }
-        }
+//         if ( ! is_wp_error( $main_parent_category ) && ! empty( $main_parent_category['term_id'] ) ) {
+//             $parent_category = term_exists( $parent_category_name, $taxon );
+//             // $child_category = term_exists( $parent_category_name, $taxon, $main_parent_category['term_id'] );
+//             if ( ! empty( $parent_category ) && ! is_wp_error( $parent_category )) {
+//                 // wp_insert_term( $parent_category, $taxon, array( 'parent' => $main_parent_category['term_id'] ) );
+//                 wp_update_term( $parent_category['term_id'], $taxon, array( 'parent' => $main_parent_category['term_id'] ) );
+//             }
+//         }
 
+		$taxon = 'product_cat';
+
+		// Get current WPML language
+		$current_lang = function_exists('apply_filters') ? apply_filters('wpml_current_language', NULL) : '';
+
+		// Get translated names if needed (optional step, depends on your source)
+		$main_parent_category_name = $item['ZYOU_FAMILYDES']; // e.g., 'Furniture'
+		$parent_category_name      = $item['ZYOU_MFAMILYDES']; // e.g., 'Tables'
+
+		// Check if main parent exists
+		$main_parent_category = term_exists( $main_parent_category_name, $taxon );
+
+		// If not, insert it
+		if ( ! $main_parent_category ) {
+			$main_parent_category = wp_insert_term( $main_parent_category_name, $taxon );
+		}
+
+		// Handle WPML translation for main parent
+		if ( function_exists('icl_object_id') && ! is_wp_error( $main_parent_category ) && ! empty( $main_parent_category['term_id'] ) ) {
+			$main_parent_category_id = icl_object_id( $main_parent_category['term_id'], $taxon, true, $current_lang );
+		} else {
+			$main_parent_category_id = $main_parent_category['term_id'];
+		}
+
+		// Now process the child category
+		if ( ! is_wp_error( $main_parent_category ) && ! empty( $main_parent_category_id ) ) {
+
+			// Check if child category exists
+			$parent_category = term_exists( $parent_category_name, $taxon );
+
+			if ( ! $parent_category ) {
+				// Insert child under the translated parent
+				$parent_category = wp_insert_term( $parent_category_name, $taxon, array( 'parent' => $main_parent_category_id ) );
+			} else {
+				// Ensure child is correctly assigned to parent
+				$parent_category_id = function_exists('icl_object_id') 
+					? icl_object_id( $parent_category['term_id'], $taxon, true, $current_lang )
+					: $parent_category['term_id'];
+
+				wp_update_term( $parent_category_id, $taxon, array( 'parent' => $main_parent_category_id ) );
+			}
+		}
         
         //update tag
         $tag =  $item['SPEC6'];
@@ -193,66 +684,10 @@ add_action('simply_update_product_data', function($item){
                 $product->save();
             }
         }
-        $pdt_product->save();   
-        
+        $pdt_product->save();
+        do_action( 'wpml_sync_all_custom_fields', $product_id );   
     }
 });
-
-function update_product_color_attributes( $product_id, $colors ) {
-
-    
-    // Ensure the attribute is registered globally in WooCommerce
-    $attr_slug = 'color'; // Global attribute slug for color
-    $attr_name = 'color';
-
-    // Check if the attribute exists; if not, create it
-    if (!WooAPI::instance()->is_attribute_exists($attr_slug)) {
-        $attribute_id = wc_create_attribute(
-            array(
-                'name'         => $attr_name,
-                'slug'         => $attr_slug,
-                'type'         => 'select',
-                'order_by'     => 'menu_order',
-                'has_archives' => 0,
-            )
-        );
-    }
-
-    $clean_colors = array_map( function ( $color ) {
-        return ucwords( trim( strtolower( $color ) ) ); // הפוך לאות ראשונה גדולה, הסר רווחים
-    }, $colors );
-
-    // Ensure terms exist for each color
-    foreach ( $clean_colors as $color ) {
-        if ( ! term_exists( $color, $attr_slug ) ) {
-            wp_insert_term( $color, $attr_slug );
-        }
-    }
-
-    // Assign the colors to the product
-    wp_set_object_terms( $product_id, $clean_colors, $attr_slug, false );
-
-    // Update the product attributes to link the taxonomy
-    $product_attributes = get_post_meta( $product_id, '_product_attributes', true );
-
-    // Check if the product already has the attribute
-    if ( ! is_array( $product_attributes ) ) {
-        $product_attributes = array();
-    }
-
-    // Add or update the color attribute
-    $product_attributes[ 'pa_' . $attr_slug ] = array(
-        'name'         => 'pa_' . $attr_slug,
-        'value'        => '',
-        'is_visible'   => 1, // Show on product page
-        'is_variation' => 0, // Not used for variations
-        'is_taxonomy'  => 1, // This is a taxonomy
-    );
-
-    // Save the updated attributes
-    update_post_meta( $product_id, '_product_attributes', $product_attributes );
-
-}
 
 //open customer in priority then in register
 //add_action( 'template_redirect', 'get_user_details_after_registration1');
@@ -488,6 +923,9 @@ function simply_modify_customer_number($data){
     
     if ($order->get_user_id() != 0) {
         $cust_number = get_user_meta($order->get_user_id(), 'priority_customer_number', true);
+        if(empty($cust_number)){
+            $cust_number = WooAPI::instance()->option('walkin_number');
+        }
     }
     else{
         $cust_number = WooAPI::instance()->option('walkin_number');
@@ -503,20 +941,24 @@ function simply_func($data)
 	$data['AGENTCODE'] = '01';    
 	$data['TYPECODE'] = '006';
     $agent_note = $data['ORDERSTEXT_SUBFORM']['TEXT'];
-    if (strlen($agent_note) > 120) {
-        $agent_note = substr($agent_note, 0, 115) . '...'; 
-    }
+//     if (strlen($agent_note) > 120) {
+//         $agent_note = substr($agent_note, 0, 115) . '...'; 
+//     }
+//     fix  code above cause fattal error
+    if (mb_strlen($agent_note, 'UTF-8') > 120) {
+		$agent_note = mb_substr($agent_note, 0, 115, 'UTF-8');
+	}
     $data['ESTR_NOTES'] = $agent_note;
 	
 	//Update payment code for the query
     $data['PAYMENTDEF_SUBFORM']['PAYMENTCODE'] = '15';
-
-    $order_id = $data['orderId'];
+	
+	$order_id = $data['orderId'];
     $order = new \WC_Order($order_id);
 
+    //set coupon to vprice instead vatprice
 	$coupon = $order->get_coupon_codes();
-
-    if (!empty($coupon)) {
+	if (!empty($coupon)) {
 		// echo "<pre>";
 		// print_r($coupon);
 		// echo "</pre>";
@@ -553,8 +995,12 @@ function simply_func($data)
         $items[] = $item;
     }
     $data['ORDERITEMS_SUBFORM'] = $items;
-
-
+	
+// 	echo "<pre>";
+// 	print_r($data);
+// 	echo "</pre>";
+// 	die();
+	
     return $data;
 }
 
@@ -575,12 +1021,12 @@ function simply_receipt_func($data)
 	
 	//Update payment code for the query
     $data['TPAYMENT2_SUBFORM'][0]['PAYMENTCODE'] = '15';
-
-    $coupon = $order->get_coupon_codes();
+	
+	$coupon = $order->get_coupon_codes();
 	if (!empty($coupon)) {
-		// echo "<pre>";
-		// print_r($coupon);
-		// echo "</pre>";
+		//echo "<pre>";
+		//print_r($coupon);
+		//echo "</pre>";
         //$mappings = get_field('coupon_agent_mappings', 'option');
 		$default_language = apply_filters('wpml_default_language', null);
 		$current_language = apply_filters('wpml_current_language', null);
@@ -594,7 +1040,7 @@ function simply_receipt_func($data)
 		if ( $current_language !== $default_language ) {
 			do_action('wpml_switch_language', $current_language);
 		}
-		//print_r( $mappings);
+		print_r( $mappings);
         if ($mappings) {
             foreach ($mappings as $mapping) {
                 if (in_array($mapping['coupon_code'], $coupon)) {
@@ -605,6 +1051,18 @@ function simply_receipt_func($data)
     }
 
     return $data;
+}
+
+add_action('simply_sync_payment_complete', 'simply_sync_payment_complete_func');
+function simply_sync_payment_complete_func($order_id){
+    global $wp_current_filter;
+
+    if ( !in_array( 'woocommerce_order_status_changed', $wp_current_filter, true ) ) {
+        return false;
+    }
+    else{
+        return true;
+    }   
 }
 
 //get priority customer number by user email

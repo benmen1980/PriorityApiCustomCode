@@ -298,8 +298,9 @@ function simply_request_data_receipt_func($data){
 	return $data;
 }
 
-//close receipt	
-add_filter('simply_after_post_receipt', 'simply_after_receipt_func');
+//close receipt 
+//remove bacuse close rceipt is now from priority	
+//add_filter('simply_after_post_receipt', 'simply_after_receipt_func');
 function simply_after_receipt_func($array)
 {
 	
@@ -377,5 +378,38 @@ function simply_after_receipt_func($array)
     curl_close($curl);
 
 }
+
+add_filter('simply_after_post_order', 'simply_after_order_func');
+function simply_after_order_func($array)
+{
+	$data['ORDSTATUSDES'] = 'מאושר לביצו';
+    // $ord_status = $array["STATDES"];
+    $order_name = $array["ORDNAME"]; 
+    $order_id = $array["order_id"];
+	$order = wc_get_order($order_id);
+	$url_addition = 'TTS_ORDSPAY(ORDNAME=\'' . $order_name . '\')';
+	$response = WooAPI::instance()->makeRequest('PATCH', $url_addition, ['body' => json_encode($data)], true);
+    if ($response['code'] <= 201 && $response['code'] >= 200 ) {
+        $order->update_meta_data('priority_order_status', 'מאושר לביצוע');
+        $order->save();
+    }
+    else {
+        $mes_arr = json_decode($response['body']);
+        $message = $response['message'] . '' . json_encode($response);
+        $message = $response['message'] . '<br>' . $response['body'] . '<br>';
+        if(isset($mes_arr->FORM->InterfaceErrors->text)){
+            $message = $mes_arr->FORM->InterfaceErrors->text;
+        }
+        $order->update_meta_data('priority_order_status', $message);
+        $order->save();
+        WooAPI::instance()->sendEmailError(
+            ['elisheva.g@simplyct.co.il',get_bloginfo('admin_email')],
+            'Error updating order status',
+            $response['body']
+        );
+    }
+
+}
+
 
 ?>
