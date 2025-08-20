@@ -49,6 +49,8 @@ function simply_func($data)
         $data['CPROFITEMS_SUBFORM'] = $items;
         // PAYMENTDEF
         unset($data['PAYMENTDEF_SUBFORM']);
+        // CPROFCONT
+        unset($data['CPROFCONT_SUBFORM']);
     }
     if($data['doctype']=='EINVOICES') {
         $id = $data['DETAILS'];

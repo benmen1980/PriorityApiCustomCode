@@ -75,6 +75,11 @@
         unset($data['CUSTNAME']);
         return $data;
     }
+    add_filter('simply_post_prospect','simply_post_prospect_func');
+    function simply_post_prospect_func($data){
+        unset($data['CUSTNAME']);
+        return $data;
+    }
     add_filter('simply_search_customer_in_priority','simply_search_customer_in_priority');
     function simply_search_customer_in_priority($data){
         $order = $data['order'];
