@@ -1,6 +1,7 @@
 <?php
 
-  use PriorityWoocommerceAPI\WooAPI;
+use PriorityWoocommerceAPI\WooAPI;
+
 
 
 add_filter('simply_syncItemsPriority_data','simply_selectPrice_func');
