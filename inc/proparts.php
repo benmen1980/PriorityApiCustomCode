@@ -45,7 +45,12 @@ add_action('simply_update_product_data', function($item){
         $product->set_description($content);
 
         $product->save();
-    }    
+    } 
+     // Update the product Price before VAT
+    if($item['product_id'] !== 0) {
+        $price_ex_vat =  $item['BASEPLPRICE'];
+        update_post_meta($item['product_id'], '_price_ex_vat', $price_ex_vat);
+    }   
 });
 
 add_filter('simply_request_data', 'simply_func');

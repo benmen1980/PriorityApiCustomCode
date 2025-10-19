@@ -33,7 +33,7 @@ if (!wp_next_scheduled('sync_cprof')) {
 add_filter('simplyct_sendEmail', 'simplyct_sendEmail_func');
 function simplyct_sendEmail_func($emails)
 {
-    array_push($emails, 'Yoav@arrowcables.com');
+    array_push($emails, 'yoav@arrowcables.com');
     return $emails;
 }
 
@@ -68,6 +68,13 @@ function syncCPRofPriority() {
               
         }
 
+    }
+    else {
+        WooAPI::instance()->sendEmailError(
+            ['margalit.t@simplyct.co.il', 'yoav@arrowcables.com'],
+            'Error Sync Quotes Priority',
+            $response['body']
+        );
     }
 };
 
@@ -491,6 +498,11 @@ function syncCPRofByNumber($sku, $quote_token = null ) {
         $response_data = json_decode($response['body_raw'], true);
         
         if ($response_data['value'][0] > 0) {
+            /*WooAPI::instance()->sendEmailError(
+                ['margalit.t@simplyct.co.il', 'yoav@arrowcables.com'],
+                'Enter Quote Sucsses',
+                'cprof number: ' . $sku . ' token: ' . $quote_token
+            );*/
             foreach ($response_data['value'] as $item) {
                 $response = CheckExistingProduct($item['CPROFNUM'],  $item);    
                 // ADDED BY ALON
@@ -521,11 +533,21 @@ function syncCPRofByNumber($sku, $quote_token = null ) {
                 $result = wp_mail($to, $subject, $message, $headers); 
                 // END - ADDED BY ALON
             }
-        } else {
-            exit(json_encode(['status' => 0, 'msg' => 'Error Sync quotes Priority ']));
-            $subj = 'check sync quote';
-            wp_mail( 'Yoav@arrowcables.com', $subj, implode(" ",$response) );
+        } 
+        else {
+            WooAPI::instance()->sendEmailError(
+                ['margalit.t@simplyct.co.il', 'yoav@arrowcables.com'],
+                'Error, the response returned empty',
+                $response['url'] . ' <br/>' . $response['body']
+            );
         }
+    }
+    else {
+        WooAPI::instance()->sendEmailError(
+            ['margalit.t@simplyct.co.il', 'yoav@arrowcables.com'],
+            'Error Sync Quotes Priority - by link with cprof number',
+            'sku: ' . $sku . '<br/>url: ' . $response['url'] . '<br/>' . $response['body']
+        );
     }
     if($send_json == 'true') {
         wp_send_json($response);
@@ -737,7 +759,8 @@ add_filter('simply_search_customer_in_priority','simply_search_customer_in_prior
 function simply_search_customer_in_priority($data){  
     $order = $data['order'];
     $order_meta_data = $order->get_meta_data();
-    $custname = WooAPI::instance()->option('walkin_number');
+    if (!isset($data['user_id']) || empty($data['user_id']))
+        $custname = WooAPI::instance()->option('walkin_number');
 
     foreach($order_meta_data as $meta) {
         // Access meta data values
@@ -861,6 +884,8 @@ function my_custom_orderitem_modifier($args) {
         $data['ORDERITEMS_SUBFORM'][sizeof($data['ORDERITEMS_SUBFORM']) - 1]['BARCODE'] = $barcode;
             
         $field = get_field('parent_id' ,$product_id);
+        $eta_stock = $item->get_meta( 'ETA' );
+
         if (!(substr($field, 0, 2) === "PQ")) {  
             //update quant
             unset($data['ORDERITEMS_SUBFORM'][sizeof($data['ORDERITEMS_SUBFORM']) - 1]['TQUANT']);
@@ -936,8 +961,6 @@ function my_custom_orderitem_modifier($args) {
                     $data['ORDERITEMS_SUBFORM'][sizeof($data['ORDERITEMS_SUBFORM']) - 1]['PRICE'] = $price_unit;
                 }
             }*/
- 
-            $eta_stock = $item->get_meta( 'ETA' );
             if ($eta_stock === "" || $eta_stock === "In Stock") {
                 $data['ORDERITEMS_SUBFORM'][sizeof($data['ORDERITEMS_SUBFORM']) - 1]['AROW_INSTOCK'] ='Y';
                 $data['ORDERITEMS_SUBFORM'][sizeof($data['ORDERITEMS_SUBFORM']) - 1]['AROW_BYSEA'] ='null';
@@ -988,6 +1011,21 @@ function my_custom_orderitem_modifier($args) {
             } 
 
         }
+
+        // Define required date
+        switch ($eta_stock) {
+            case 'In Stock':
+                $prdate = date('Y-m-d', strtotime('+1 days'));
+                break;
+            case 'כ- 10 ימים':
+                $prdate = date('Y-m-d', strtotime('+10 days'));
+                break;
+            default:
+                $prdate = date('Y-m-d', strtotime('+25 days'));   
+                break;
+        }
+
+        $data['ORDERITEMS_SUBFORM'][sizeof($data['ORDERITEMS_SUBFORM']) - 1]['PRDATE'] = $prdate;
 
         if ($data['ORDERITEMS_SUBFORM'][sizeof($data['ORDERITEMS_SUBFORM']) - 1]['AROW_INSTOCK'] == 'Y' ) {
             $data['ORDERITEMS_SUBFORM'][sizeof($data['ORDERITEMS_SUBFORM']) - 1]['AROW_MITKABEL'] = date('Y-m-d', strtotime('+3 days'));
@@ -1045,6 +1083,13 @@ function update_status_cprofnum($cprofnum)
         $response_data = json_decode($response['body_raw'], true);
         // updte_post_meta($cprof_id'cprof_status', 'הוזמן מהחנות');
     }
+    else {
+        WooAPI::instance()->sendEmailError(
+            ['margalit.t@simplyct.co.il', 'yoav@arrowcables.com'],
+            'Error updating a quote that was requested and paid failed',
+            'cprofnum: ' . $cprofnum . ' <br/>' . $response['body']
+        );
+    }
 }
 
 // Send email in open the quote
@@ -1077,7 +1122,6 @@ add_action('simply_open_quote_request', function($quotemun) {
         $result = wp_mail($to, $subject, $message, $headers); 
     }
 });
-
 
 // Send email in approve the order
 add_action('simply_approve_order_request', function($ordname) {  
@@ -1128,7 +1172,7 @@ function syncInventoryPriority()
     $expand = '$expand=LOGCOUNTERS_SUBFORM($expand=PARTAVAIL_SUBFORM($select=AROW_DUEDATE,TQUANT,TITLE))';
     
     $response = WooAPI::instance()->makeRequest('GET', 'LOGPART?$select=BARCODE,PARTNAME,YAEL_PLEADTIME,BASEPLPRICE&$filter=SPEC14 ne \'\' and '.$url_addition.' and INVFLAG eq \'Y\' &' . $expand, [], 
-                WooAPI::instance()->option('log_inventory_priority', false));
+                true);
 
     // check response status
     if ($response['status']) {
@@ -1314,9 +1358,9 @@ function syncInventoryPriority()
         WooAPI::instance()->updateOption('inventory_priority_update', time());
     } else {
         WooAPI::instance()->sendEmailError(
-            WooAPI::instance()->option('email_error_sync_inventory_priority'),
+            ['margalit.t@simplyct.co.il', 'yoav@arrowcables.com'],
             'Error Sync Inventory Priority',
-            $response['body']
+            $response['url'] . '<br/>' . $response['body']
         );
     }
 }
@@ -1331,98 +1375,108 @@ add_filter('simply_accounts_receivable_table', function( $priority_customer_numb
     $additionalurl = 'ACCOUNTS_RECEIVABLE?$select=ACCNAME,BALANCE3&$expand=ARFNCITEMS3_SUBFORM($select=BALDATE,FNCDATE,ORDNAME,IVNUM,DETAILS,SUMDEBIT,SUMCREDIT,BAL)&$filter=ACCNAME eq \'' . $priority_customer_number . '\'';
     $args = [];
     $response = WooAPI::instance()->makeRequest("GET", $additionalurl, $args, true);
-    $data = json_decode($response['body']);
 
-    if (!empty($data->value)) {
-        echo "<table> <tr>";
-        echo "<th></th><th>" . esc_html__('BALDATE', 'p18w') . "</th> <th>" . esc_html__('FNCDATE', 'p18w') . "</th> <th>" . esc_html__('ORDNUM', 'p18w') . "</th> <th>" . esc_html__('IVNUM', 'p18w') . "</th> <th>" . esc_html__('DETAILS', 'p18w') . "</th> <th>" . esc_html__('DEBTBAL', 'p18w') . "</th> <th>" . esc_html__('RIGHTBAL', 'p18w') . "</th> <th>" . esc_html__('BALANCE', 'p18w') . "</th><th></th>";
-        echo "</tr>";
-        global $woocommerce;
-        $items = $woocommerce->cart->get_cart();
-        $retrive_data = WC()->session->get('session_vars');
-        $retrieve_ivnum = WC()->session->get('pdt_ivnum');
+    // check response status
+    if ($response['status']) {
+        $data = json_decode($response['body']);
 
-        $pdts_in_cart = array();
-        if (!empty($retrive_data['ordertype'])) {
-            foreach (WC()->cart->get_cart() as $cart_item_key => $cart_item) {
-                $pdts_in_cart[] = $cart_item['_other_options']['product-ivnum'];
-            }
-        }
+        if (!empty($data->value)) {
+            echo "<table> <tr>";
+            echo "<th></th><th>" . esc_html__('BALDATE', 'p18w') . "</th> <th>" . esc_html__('FNCDATE', 'p18w') . "</th> <th>" . esc_html__('ORDNUM', 'p18w') . "</th> <th>" . esc_html__('IVNUM', 'p18w') . "</th> <th>" . esc_html__('DETAILS', 'p18w') . "</th> <th>" . esc_html__('DEBTBAL', 'p18w') . "</th> <th>" . esc_html__('RIGHTBAL', 'p18w') . "</th> <th>" . esc_html__('BALANCE', 'p18w') . "</th><th></th>";
+            echo "</tr>";
+            global $woocommerce;
+            $items = $woocommerce->cart->get_cart();
+            $retrive_data = WC()->session->get('session_vars');
+            $retrieve_ivnum = WC()->session->get('pdt_ivnum');
 
-        $i = 1;  
-        $todayDate = new DateTime(); 
-        foreach ($data->value[0]->ARFNCITEMS3_SUBFORM as $key => $value) {
-            //Checking whether the date has passed
-            $fncDate = new DateTime($value->FNCDATE);
-            $red = ($todayDate > $fncDate) ? 'red' : ''; 
-                
-            echo "<tr class='pass_date " . $red . "'>";
-
-            //check if already pay for this ivnum
-            $disabled = '';
-            if (!empty($retrieve_ivnum)) {
-                if (in_array($value->IVNUM, $retrieve_ivnum)) {
-                    $disabled = 'disabled="disabled"';
-                } else {
-                    // $disabled = '';
+            $pdts_in_cart = array();
+            if (!empty($retrive_data['ordertype'])) {
+                foreach (WC()->cart->get_cart() as $cart_item_key => $cart_item) {
+                    $pdts_in_cart[] = $cart_item['_other_options']['product-ivnum'];
                 }
             }
-            if (!empty($pdts_in_cart)) {
-                if (in_array($value->IVNUM, $pdts_in_cart)) {
-                    $checked = 'checked';
-                } else {
-                    $checked = '';
-                }
-            }
-            $date = $value->BALDATE;
-            $createDate = new DateTime($date);
-            $strip = $createDate->format('d/m/y');
 
-            if (!isset($checked)) {
-                $checked = '';
-            }
-            echo '<td><input type="checkbox" ' . $checked . ' ' . $disabled . ' name="' . $value->SUMDEBIT . '#' . $value->IVNUM . '#' . $strip . '#' . $value->DETAILS . '" class="obligo_checkbox" data-sum=' . $value->SUMDEBIT . ' data-IVNUM=' . $value->IVNUM . ' value="obligo_chk_sum' . $i . '"></td>';
-            
-            // Create the array object in a new order
-            $order = ['BALDATE', 'FNCDATE', 'ORDNAME', 'IVNUM', 'DETAILS', 'SUMDEBIT', 'SUMCREDIT', 'BAL'];
-            $sortedValue = new stdClass();
-            foreach ($order as $key) {
-                $sortedValue->$key = property_exists($value, $key) ? $value->$key : null;
-            }
+            $i = 1;  
+            $todayDate = new DateTime(); 
+            foreach ($data->value[0]->ARFNCITEMS3_SUBFORM as $key => $value) {
+                //Checking whether the date has passed
+                $fncDate = new DateTime($value->FNCDATE);
+                $red = ($todayDate > $fncDate) ? 'red' : ''; 
+                    
+                echo "<tr class='pass_date " . $red . "'>";
 
-            foreach ($sortedValue as $Fkey => $Fvalue) {
-                if ($Fkey == 'BALDATE' || $Fkey == 'FNCDATE' || $Fkey == 'ORDNAME' || $Fkey == 'IVNUM' || $Fkey == 'DETAILS' || $Fkey == 'SUMDEBIT' || $Fkey == 'SUMCREDIT' || $Fkey == 'BAL') {
-                    if ($Fkey == 'BALDATE') {
-                        $timestamp = strtotime($Fvalue);
-                        echo "<td>" . date('d/m/y', $timestamp) . "</td>";
-                    } elseif ($Fkey == 'FNCDATE') {
-                        $timestampFnc = strtotime($Fvalue);
-                        echo "<td>" . date('d/m/y', $timestampFnc) . "</td>";
+                //check if already pay for this ivnum
+                $disabled = '';
+                if (!empty($retrieve_ivnum)) {
+                    if (in_array($value->IVNUM, $retrieve_ivnum)) {
+                        $disabled = 'disabled="disabled"';
                     } else {
-                        if ( $Fkey == 'SUMDEBIT' || $Fkey == 'SUMCREDIT' || $Fkey == 'BAL' )
-                            $Fvalue = number_format($Fvalue, 2, '.', ',') . ' ש"ח';
-                        echo "<td>" . $Fvalue . "</td>";
+                        // $disabled = '';
                     }
                 }
-            }
-            echo "<td>
-                    <button style='font-size: 13px!important;' type='button' class='open_doc btn_open_ivnum' data-ivnum='" . htmlspecialchars($value->IVNUM, ENT_QUOTES, 'UTF-8') . "'>" 
-                        . __('Presentation of the invoice', 'p18w') . "
-                        <div class='loader_wrap'>
-                            <div class='loader_spinner'>
-                                <div class='line'></div>
-                                <div class='line'></div>
-                                <div class='line'></div>
-                            </div>
-                        </div>
-                    </button>
-                </td>";
-            echo "</tr>";
-            $i++;
-        }
-        echo "</table>";
+                if (!empty($pdts_in_cart)) {
+                    if (in_array($value->IVNUM, $pdts_in_cart)) {
+                        $checked = 'checked';
+                    } else {
+                        $checked = '';
+                    }
+                }
+                $date = $value->BALDATE;
+                $createDate = new DateTime($date);
+                $strip = $createDate->format('d/m/y');
 
-        echo "</form>";
+                if (!isset($checked)) {
+                    $checked = '';
+                }
+                echo '<td><input type="checkbox" ' . $checked . ' ' . $disabled . ' name="' . $value->SUMDEBIT . '#' . $value->IVNUM . '#' . $strip . '#' . $value->DETAILS . '" class="obligo_checkbox" data-sum=' . $value->SUMDEBIT . ' data-IVNUM=' . $value->IVNUM . ' value="obligo_chk_sum' . $i . '"></td>';
+                
+                // Create the array object in a new order
+                $order = ['BALDATE', 'FNCDATE', 'ORDNAME', 'IVNUM', 'DETAILS', 'SUMDEBIT', 'SUMCREDIT', 'BAL'];
+                $sortedValue = new stdClass();
+                foreach ($order as $key) {
+                    $sortedValue->$key = property_exists($value, $key) ? $value->$key : null;
+                }
+
+                foreach ($sortedValue as $Fkey => $Fvalue) {
+                    if ($Fkey == 'BALDATE' || $Fkey == 'FNCDATE' || $Fkey == 'ORDNAME' || $Fkey == 'IVNUM' || $Fkey == 'DETAILS' || $Fkey == 'SUMDEBIT' || $Fkey == 'SUMCREDIT' || $Fkey == 'BAL') {
+                        if ($Fkey == 'BALDATE') {
+                            $timestamp = strtotime($Fvalue);
+                            echo "<td>" . date('d/m/y', $timestamp) . "</td>";
+                        } elseif ($Fkey == 'FNCDATE') {
+                            $timestampFnc = strtotime($Fvalue);
+                            echo "<td>" . date('d/m/y', $timestampFnc) . "</td>";
+                        } else {
+                            if ( $Fkey == 'SUMDEBIT' || $Fkey == 'SUMCREDIT' || $Fkey == 'BAL' )
+                                $Fvalue = number_format($Fvalue, 2, '.', ',') . ' ש"ח';
+                            echo "<td>" . $Fvalue . "</td>";
+                        }
+                    }
+                }
+                echo "<td>
+                        <button style='font-size: 13px!important;' type='button' class='open_doc btn_open_ivnum' data-ivnum='" . htmlspecialchars($value->IVNUM, ENT_QUOTES, 'UTF-8') . "'>" 
+                            . __('Presentation of the invoice', 'p18w') . "
+                            <div class='loader_wrap'>
+                                <div class='loader_spinner'>
+                                    <div class='line'></div>
+                                    <div class='line'></div>
+                                    <div class='line'></div>
+                                </div>
+                            </div>
+                        </button>
+                    </td>";
+                echo "</tr>";
+                $i++;
+            }
+            echo "</table>";
+
+            echo "</form>";
+        }
+    } else {
+        WooAPI::instance()->sendEmailError(
+            ['margalit.t@simplyct.co.il', 'yoav@arrowcables.com'],
+            'Error Sync accounts receivable table',
+            'customer number is clicked: ' . $priority_customer_number . '<br/>' . $response['body']
+        );
     }
     return true;
 });

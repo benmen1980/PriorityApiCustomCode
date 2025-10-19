@@ -207,7 +207,7 @@ function simply_after_post_otc_func($array)
             if (substr($response_data['ivnum'], 0, 2) === "OV") { 
                 $msg = 'סגורה';
             } else if (isset($response_data['message'])) {
-                $msg = $response_data['message'];
+                $msg = 'otc close error: ' . $response_data['message'];
             }
             $order->update_meta_data('priority_invoice_status', $msg);
 			$order->save(); 
@@ -215,9 +215,9 @@ function simply_after_post_otc_func($array)
     }
     else  {
         if (isset($response_data['message'])) {
-            $msg = $response_data['message'];
+            $msg = 'otc close error: ' . $response_data['message'];
         } else {
-            $msg = "No error message found.";
+            $msg = 'otc close error: No error message found.';
         }
         $order = wc_get_order($order_id);
         $order->update_meta_data('priority_invoice_status', $msg);
