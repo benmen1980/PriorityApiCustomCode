@@ -7,15 +7,21 @@ function simply_func($data){
     //$order_id = $data['AMB_CRMORDNAME'];
 
 	$order_id = $data['orderId'];
-    $order = new \WC_Order($order_id);
-
-	$data['AMB_CRMORDNAME'] = $order_id;
+	$order = wc_get_order($order_id);
+	$data['AMB_CRMORDNAME'] =  (string) $order_id;
+	//$data['AMB_CRMORDNAME'] = '1'.$order_id;
 
 	$user_id = $order->get_user_id();
 	$order_user = get_userdata($user_id);
     $order_shipping_method = $order->get_shipping_method();
-    if ( 'איסוף עצמי' === $order_shipping_method ) {
-		$order_shipping_code  = '0';
+	$total = $order->get_total();
+	// Get total after coupons but without shipping
+	$total_excluding_shipping = $order->get_total() - $order->get_shipping_total();
+
+
+
+    if ( ('איסוף עצמי' === $order_shipping_method) || ('איסוף עצמי מנוף הגליל' === $order_shipping_method)) {
+		$order_shipping_code  = '60';
 		$order_shipping_desc  = 'ללא';
 		$order_shipping_price = 0;
 	} elseif ( 'שליח עד הבית חינם' === $order_shipping_method ) {
@@ -23,7 +29,12 @@ function simply_func($data){
 		$order_shipping_desc  = $order_shipping_method;
 		$order_shipping_price = 0;
 	} elseif ( 'שליח עד הבית' === $order_shipping_method ) {
-		$order_shipping_code  = '20';
+		if($total_excluding_shipping > 200){
+			$order_shipping_code  = '10';
+		}
+		else{
+			$order_shipping_code  = '20';	
+		}
 		$order_shipping_desc  = $order_shipping_method;
 		$order_shipping_price = 29.90;
 	} elseif ( 'שליח מוזל' === $order_shipping_method ) {
@@ -36,9 +47,14 @@ function simply_func($data){
 		$order_shipping_price = 14.90;
 	}
 
-    $data['AYEL_SHIPCCODE'] = $order_shipping_code;
+    $data['AYEL_SHIPCCODE'] = $order_shipping_code; 
+	if ( ('איסוף עצמי' === $order_shipping_method) || ('איסוף עצמי מנוף הגליל' === $order_shipping_method)) {
+		$data['STCODE'] = "60";
+	}
+	else{
+		$data['STCODE'] = "40";
+	}
 	
-	$data['STCODE'] = "40";
 
     $customer_id = $order->get_customer_id() ? $order->get_customer_id() : '0';
     //$data['AMB_CRMCUSTNAME'] = (string)$customer_id;
@@ -75,11 +91,12 @@ function simply_func($data){
         'STATE' => $shipping_city,
         'ZIP' => $shipping_postcode,
 		'ADDRESS3' => $shipping_app_number,
-		'SHIPACCOUNTNUM' => $shipping_floor_number
+		'SHIPACCOUNTNUM' => $shipping_floor_number,
+		'EMAIL' => $order->get_billing_email()
     ];
-
 	$data['SHIPTO2_SUBFORM'] = $shipping_data;
 	unset($data['PAYMENTDEF_SUBFORM']);
+	unset($data['BOOKNUM']);
 	$payaccount = get_post_meta($order->get_id(), 'icredit_ccnum', true);
 	$payaccount = substr($payaccount, -4);
 	$data['PAYMENTDEF_SUBFORM']['PAYMENTCODE'] = "24"; 
@@ -90,7 +107,7 @@ function simply_func($data){
 	//set coupon to vprice instead vatprice
 	$coupon = $order->get_coupon_codes();
 	$items = [];
-    foreach($data['ORDERITEMS_SUBFORM'] as $item ){
+	foreach($data['ORDERITEMS_SUBFORM'] as $item ){
 		$sku = $item['PARTNAME'];
 		$product_id = wc_get_product_id_by_sku($sku);
 		//if coupon or shipping
@@ -102,11 +119,19 @@ function simply_func($data){
 			if($item['PARTNAME'] == '000' ){
 				if(!empty($coupon) && $item['TQUANT'] == -1){
 					$item['PDES'] = $coupon[0];
+					$item['VPRICE'] =  -1 * $item['VPRICE'];
+					$item['TQUANT'] = 1;
 				}
 			}
 			//remove shipping if shiping has cost
+// 			else{
+// 				if($item['VPRICE'] > 0){
+// 					continue;
+// 				}
+// 			}
+// 			//rivka asked to remove shipping at all
 			else{
-				if($item['VPRICE'] > 0){
+				if($item['VPRICE'] >= 0 ){
 					continue;
 				}
 			}
@@ -137,6 +162,23 @@ function simply_func($data){
         $items[] = $item;
     }
     $data['ORDERITEMS_SUBFORM'] = $items;
+	// echo "<pre>";
+	// print_r($data);
+	// echo "</pre>";
+	// die();
+	//$data['ORDSTATUSDES'] = 'מאושרת לביצו';
+
+
+	//add partname 60 for איסוף עצמי
+// 	if ( 'איסוף עצמי' === $order_shipping_method ) {
+// 		$data['ORDERITEMS_SUBFORM'][] = [
+// 			'PARTNAME' => '60',
+// 			'TQUANT' => (int)1,
+// 			'PDES' => $order_shipping_method,
+// 			'DUEDATE' => date('Y-m-d'),
+// 			'VATPRICE' => 0
+// 		];
+// 	}
 
 	return $data;
 }
@@ -244,33 +286,95 @@ function simply_update_product_price_func($item)
 
 //allow only to update price if product variation already exist
 add_action('simply_update_variation_price','simply_update_variation_price_func');
-function simply_update_variation_price_func($variation_data){
-    $variation_id = wc_get_product_id_by_sku($variation_data['sku']);
-    $product = wc_get_product($variation_id);
-	$parent_product_id = $product->get_parent_id();
+function simply_update_variation_price_func($variation_data) {
+    $variation_id = wc_get_product_id_by_sku($variation_data['sku']); // Get variation ID by SKU
+    $product = wc_get_product($variation_id); // Load the variation product
+    $parent_product_id = $product->get_parent_id(); // Get the parent product ID
 
+    $variation = new WC_Product_Variation($variation_id); // Load variation as WC_Product_Variation
+
+//     // Iterating through the variation's attributes
+//     foreach ($variation_data['attributes'] as $attribute => $term_name) {
+//         echo 'Processing term name: ' . $term_name . '<br>';
+
+//         // Construct the taxonomy name
+//         $taxonomy = 'pa_' . sanitize_title($attribute);
+
+//         // Check if the term exists, and create it if it doesn't
+//         if (!term_exists($term_name, $taxonomy)) {
+//             $response = wp_insert_term($term_name, $taxonomy); // Create the term
+//             if (is_wp_error($response)) {
+//                 echo 'Error creating term: ' . $response->get_error_message() . '<br>';
+//                 continue; // Skip to the next attribute if term creation fails
+//             }
+//         }
+
+//         // Get the term slug
+//         $term = get_term_by('name', $term_name, $taxonomy);
+//         if (!$term) {
+//             echo "Error: Term '$term_name' not found in taxonomy '$taxonomy'.<br>";
+//             continue; // Skip to the next attribute if the term is missing
+//         }
+//         $term_slug = $term->slug;
+
+//         echo 'Term slug: ' . $term_slug . '<br>';
+
+//         // Get the parent product's terms for this taxonomy
+//         $post_term_names = wp_get_post_terms($parent_product_id, $taxonomy, array('fields' => 'names'));
+//         echo 'Parent product terms: ';
+//         print_r($post_term_names);
+//         echo '<br>';
+
+//         // If the term is not associated with the parent product, add it
+//         if (is_array($post_term_names) && !in_array($term_name, $post_term_names)) {
+//             wp_set_post_terms($parent_product_id, $term_name, $taxonomy, true);
+//             echo "Added term '$term_name' to parent product.<br>";
+//         }
+
+//         // Check if the attribute already exists for the variation
+//         $existing_attributes = get_post_meta($variation_id, '_variation_attributes', true);
+//         if (!is_array($existing_attributes)) {
+//             $existing_attributes = array();
+//         }
+
+//         // Update or add the attribute for the variation
+//         $existing_attributes['attribute_' . $taxonomy] = $term_slug;
+//         update_post_meta($variation_id, '_variation_attributes', $existing_attributes);
+
+//         // Save the variation
+//         $variation->save();
+
+//         echo 'Updated variation ID ' . $variation_id . ' with attribute ' . $taxonomy . ' = ' . urldecode($term_slug) . '<br>';
+		
+//     }
+// 	wp_update_post(array(
+//     'ID'          => $variation_id,
+//     'post_parent' => $parent_product_id, // Set to the correct parent product ID
+// ));
 	$product_attributes = get_post_meta($parent_product_id, '_product_attributes', true);
-		if (isset($product_attributes['size'])) {
-		// Convert 'size' to taxonomy-based 'pa_size'
-		$product_attributes['pa_size'] = array(
-			'name'         => 'pa_size',
-			'value'        => '', // Leave empty for taxonomy-based attributes
-			'position'     => $product_attributes['size']['position'],
-			'is_visible'   => $product_attributes['size']['is_visible'],
-			'is_variation' => $product_attributes['size']['is_variation'],
-			'is_taxonomy'  => 1, // Set to taxonomy-based
-		);
+	if (isset($product_attributes['size'])) {
+    // Convert 'size' to taxonomy-based 'pa_size'
+    $product_attributes['pa_size'] = array(
+        'name'         => 'pa_size',
+        'value'        => '', // Leave empty for taxonomy-based attributes
+        'position'     => $product_attributes['size']['position'],
+        'is_visible'   => $product_attributes['size']['is_visible'],
+        'is_variation' => $product_attributes['size']['is_variation'],
+        'is_taxonomy'  => 1, // Set to taxonomy-based
+    );
 
-		// Remove the old custom attribute
-		unset($product_attributes['size']);
-	}
+    // Remove the old custom attribute
+    unset($product_attributes['size']);
+}
+
+ 
 	$pri_price = $variation_data['regular_price'];
-	//$product_status = get_post_status($parent_product_id);
-	//if ($product_status == 'publish') {
+	$product_status = get_post_status($parent_product_id);
+	if ($product_status == 'publish') {
 	update_post_meta($variation_id, '_regular_price',$pri_price);
 	$product->set_status('publish');
 	$product->save();
-	//}
+	}
 }
 
 //field to create attribute variation
@@ -282,13 +386,13 @@ function simply_ItemsAtrrVariation_func($item)
 	return $item;
 }
 
-
 add_filter('simply_request_data_receipt', 'simply_request_data_receipt_func');
 function simply_request_data_receipt_func($data){
-	unset($data['PAYMENTDEF_SUBFORM']);
+	
 	$order_id = $data['orderId'];
 	$order = wc_get_order($order_id);
 	$payaccount = get_post_meta($order_id, 'icredit_ccnum', true);
+	unset($data['PAYMENTDEF_SUBFORM']);
 	$payaccount = substr($payaccount, -4);
 	$data['TPAYMENT2_SUBFORM'][0]['PAYMENTCODE'] = "40"; 
 	$data['TPAYMENT2_SUBFORM'][0]['payaccount'] = $payaccount;
@@ -298,8 +402,7 @@ function simply_request_data_receipt_func($data){
 	return $data;
 }
 
-//close receipt 
-//remove bacuse close rceipt is now from priority	
+//close receipt	
 //add_filter('simply_after_post_receipt', 'simply_after_receipt_func');
 function simply_after_receipt_func($array)
 {
@@ -379,18 +482,18 @@ function simply_after_receipt_func($array)
 
 }
 
-add_filter('simply_after_post_order', 'simply_after_order_func');
+//add_filter('simply_after_post_order', 'simply_after_order_func');
 function simply_after_order_func($array)
 {
-	$data['ORDSTATUSDES'] = 'מאושר לביצו';
+	$data['ORDSTATUSDES'] = 'מאושרת לבצוע';
     // $ord_status = $array["STATDES"];
     $order_name = $array["ORDNAME"]; 
     $order_id = $array["order_id"];
 	$order = wc_get_order($order_id);
-	$url_addition = 'TTS_ORDSPAY(ORDNAME=\'' . $order_name . '\')';
+	$url_addition = 'ORDERS(ORDNAME=\'' . $order_name . '\')';
 	$response = WooAPI::instance()->makeRequest('PATCH', $url_addition, ['body' => json_encode($data)], true);
     if ($response['code'] <= 201 && $response['code'] >= 200 ) {
-        $order->update_meta_data('priority_order_status', 'מאושר לביצוע');
+        $order->update_meta_data('priority_order_status', 'מאושרת לבצוע');
         $order->save();
     }
     else {
@@ -409,6 +512,23 @@ function simply_after_order_func($array)
         );
     }
 
+}
+
+
+add_filter('simplyct_sendEmail', 'simplyct_sendEmail_func');
+
+function simplyct_sendEmail_func($send) {
+    // Add multiple email addresses
+    $extra_emails = [
+        'rivkade@solgar.co.il',
+		'michalra@solgar.co.il',
+		'elisheva.g@simplyct.co.il'
+    ];
+
+    // Merge with existing recipients
+    $send = array_merge($send, $extra_emails);
+
+    return $send;
 }
 
 
