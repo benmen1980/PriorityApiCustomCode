@@ -34,7 +34,10 @@ function simply_syncItemsPriority_data_func($data)
     $data['expand'] .= ',INTERNALDIALOGTEXT_SUBFORM';
 	return $data;
 }
-
+    
+/****
+ * Canceled with the approval and order of Shmulik
+ * 
 // update another fields to product
 add_action('simply_update_product_data', function($item){
     $product_id = $item['product_id'];
@@ -46,15 +49,14 @@ add_action('simply_update_product_data', function($item){
             $short_text .= ' ' . html_entity_decode( $clean_text );
         }
     }
-	
+
 	$post_content = '';
     if ( isset( $item['INTERNALDIALOGTEXT_SUBFORM'] ) ) {
         foreach ( $item['INTERNALDIALOGTEXT_SUBFORM'] as $content ) {
             $clean_text = preg_replace('/<style>.*?<\/style>/s', '', $content);
             $post_content .= ' ' . html_entity_decode( $clean_text );
         }
-    }
-    
+    }    
 
     if($product_id !== 0) {
 
@@ -65,17 +67,30 @@ add_action('simply_update_product_data', function($item){
             'post_content' => $post_content
         ));
     }
-
 });
+*/
 
 // update status of product to publish if SHOEINWEB equal to 'Y'
-add_action('custom_change_product_status', 'custom_handle_product_status_change');
+// add_action('custom_change_product_status', 'custom_handle_product_status_change');
 function custom_handle_product_status_change($product_id) {
     wp_update_post(array(
         'ID'          => $product_id,
         'post_status' => 'publish'
     ));
     wp_cache_flush(); // Clears cache to ensure fresh data
+}
+
+// update only title and price but not update ststus anyone
+add_action('simply_update_product_price', 'simply_update_product_price_func');
+function simply_update_product_price_func($item)
+{
+    $product_id = $item['product_id'];
+    $set_tax = get_option('woocommerce_calc_taxes');
+    $pri_price = (wc_prices_include_tax() == true || $set_tax == 'no') ? $item['VATPRICE'] : $item['BASEPLPRICE'];
+    $my_product = wc_get_product( $product_id );
+    $my_product->set_name( $item['PARTDES'] );
+    $my_product->set_regular_price( $pri_price );
+    $my_product->save();
 }
 
 // search CUSTNAME in priority by phone or email
@@ -122,5 +137,19 @@ function simply_search_customer_in_priority_func($data){
     }
     
     $data['CUSTNAME'] = $custname;
+    return $data;
+}
+
+// update the "VAT Code" field in a customer's tax return
+add_filter('simply_request_data', 'simply_func');
+function simply_func($data)
+{
+    $order_id = $data['orderId'];
+    $order = wc_get_order($order_id);
+    $order_cc_meta = $order->get_meta('_transaction_data');
+    $idnum = $order_cc_meta['CardHolderID'];
+    if (!empty($idnum)){
+        $data['ORDREFA'] = $idnum;
+    };
     return $data;
 }

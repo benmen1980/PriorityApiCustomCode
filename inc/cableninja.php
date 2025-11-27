@@ -15,19 +15,8 @@ function ajax_enqueue() {
 
 add_action( 'wp_enqueue_scripts', 'ajax_enqueue' );
 
-add_action('sync_cprof', 'syncCPRofPriority');
-
-// Clear any existing scheduled events for 'sync_cprof'
-wp_clear_scheduled_hook('sync_cprof');
-
-if (!wp_next_scheduled('sync_cprof')) {
-
-    $res = wp_schedule_event(time(), 'hourly', 'sync_cprof');
-
-}
-
 /**
-* Change email for errors from the site manager
+ * Change email for errors from the site manager
 *
 */
 add_filter('simplyct_sendEmail', 'simplyct_sendEmail_func');
@@ -35,6 +24,16 @@ function simplyct_sendEmail_func($emails)
 {
     array_push($emails, 'yoav@arrowcables.com');
     return $emails;
+}
+
+// Clear any existing scheduled events for 'sync_cprof'
+// wp_clear_scheduled_hook('sync_cprof');
+add_action('sync_cprof', 'syncCPRofPriority');
+
+if (!wp_next_scheduled('sync_cprof')) {
+    
+    $res = wp_schedule_event(time(), 'hourly', 'sync_cprof');
+    
 }
 
 /**
@@ -624,7 +623,7 @@ function redirect($url) {
  // Define a custom function to modify the value of $begindate
  function report_priority_quote_sixmonth($begindate) {
     // Change $begindate to six months ago
-    $modified_begindate = date(DATE_ATOM, strtotime('-6 month'));
+    $modified_begindate = date(DATE_ATOM, strtotime('-1 month'));
     return urlencode($modified_begindate);
 };
 add_filter('simply_excel_reports', 'report_priority_quote_sixmonth');
@@ -1355,7 +1354,7 @@ function syncInventoryPriority()
         }
 
         // add timestamp
-        WooAPI::instance()->updateOption('inventory_priority_update', time());
+        // WooAPI::instance()->updateOption('inventory_priority_update', time());
     } else {
         WooAPI::instance()->sendEmailError(
             ['margalit.t@simplyct.co.il', 'yoav@arrowcables.com'],
