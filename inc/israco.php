@@ -353,3 +353,92 @@ function custom_wc_text_changes($translated_text, $text, $domain) {
 
     return $translated_text;
 }
+
+// Creditguard implementation script for using Apple Pay for website payments
+add_action( 'wp_enqueue_scripts', 'add_applepay_script_to_checkout' );
+function add_applepay_script_to_checkout() {
+
+    if ( ! function_exists('is_checkout') ) {
+        return;
+    }
+
+    if ( is_checkout() ) {
+
+        // ***  TEST ***
+        // wp_enqueue_script(
+        //     'applepay-creditguard-test',
+        //     'https://ppsuat.creditguard.co.il/plugins/applePayOnIframe.js',
+        //     array(),
+        //     null,
+        //     true
+        // );
+
+        // *** For production ***
+        wp_enqueue_script(
+            'applepay-creditguard-production',
+            'https://pps.creditguard.co.il/plugins/applePayOnIframe.js',
+            array(),
+            null,
+            true
+        );
+    }
+}
+
+//Show receipt printout for display in payment link
+add_filter('simply_invoice_already_paid_message', function($msg, $invoice_number) {
+    
+    $username = WooAPI::instance()->option('username');
+    $password = WooAPI::instance()->option('password');
+    $url = 'https://'.WooAPI::instance()->option('url');
+    if( false !== strpos( $url, 'p.priority-connect.online' ) ) {
+        $url = 'https://p.priority-connect.online/wcf/service.svc';
+    }
+    $tabulaini = WooAPI::instance()->option('application');
+    $company = WooAPI::instance()->option('environment');
+    $appid = WooAPI::instance()->option('X-App-Id');
+    $appkey = WooAPI::instance()->option('X-App-Key');
+
+    $data['IVNUM'] = $invoice_number;
+    $data['credentials']['appname'] = 'demo';
+    $data['credentials']['username'] = $username;
+    $data['credentials']['password'] = $password;
+    $data['credentials']['url'] = $url;
+    $data['credentials']['tabulaini'] = $tabulaini;
+    $data['credentials']['language'] = '1';
+    $data['credentials']['profile']['company'] = $company;
+    $data['credentials']['devicename'] = 'roy';
+    $data['credentials']['appid'] = $appid;
+    $data['credentials']['appkey'] = $appkey;
+
+    $curl = curl_init();
+    curl_setopt_array($curl, 
+        array(
+            CURLOPT_URL => 'http://hub2node-3-env.eba-xipdcajk.us-west-2.elasticbeanstalk.com/printTinvoice',
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_ENCODING => '',
+            CURLOPT_MAXREDIRS => 10,
+            CURLOPT_TIMEOUT => 0,
+            CURLOPT_FOLLOWLOCATION => true,
+            CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
+            CURLOPT_CUSTOMREQUEST => 'POST',
+            CURLOPT_POSTFIELDS => json_encode($data),
+            CURLOPT_HTTPHEADER => array(
+                'Content-Type: application/json'
+        ),
+    ));
+
+    $response = curl_exec($curl);
+    $response_data = json_decode($response, true);
+
+    $pdf = $response_data['invoice_url'];
+
+    curl_close($curl);
+
+    return sprintf (
+        __(' This receipt has already been paid. 
+            To view or print the receipt, please <a href="%s" target="_blank">click here</a>. 
+            Receipt number: %s', 'madimz'),
+            $pdf,
+            $invoice_number
+    );
+}, 10, 2);
