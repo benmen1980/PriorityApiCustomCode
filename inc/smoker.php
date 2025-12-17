@@ -82,7 +82,6 @@ add_filter('simply_update_parent_status', function($post_data) {
 // search CUSTNAME in priority by phone
 add_filter('simply_search_customer_in_priority','simply_search_customer_in_priority_func');
 function simply_search_customer_in_priority_func($data) {
-    echo '01';
     $order = $data['order'];
     if($order)
         $phone =  $order->get_billing_phone();
@@ -152,9 +151,7 @@ function simply_search_customer_in_priority_func($data) {
                 $response['body']
             );
         }
-    } 
-    echo '02' . $custname;
-    
+    }     
     $data['CUSTNAME'] = $custname;
     return $data;
 }
