@@ -1,11 +1,12 @@
 <?php
 
-use PriorityWoocommerceAPI\WooAPI;
+  use PriorityWoocommerceAPI\WooAPI;
+
 
 add_filter('simply_syncItemsPriority_data','simply_selectPrice_func');
 function simply_selectPrice_func($data)
 {
-    $data['select'].=',FBCN_SHORT_DES_PART,FBCC_WEBSITEIMAGES,FBCN_MODEL_NAME';
+    $data['select'].=',FBCN_SHORT_DES_PART,FBCC_WEBSITEIMAGES,FBCN_MODEL_NAME,ROYY_SPEC1,ROYY_SPEC2,ROYY_SPEC3';
     return $data;
 }
 
@@ -27,14 +28,23 @@ function simply_ItemsAtrrVariation_func($item)
 	return $item;
 }
 
+add_filter('simply_should_publish_pdt', 'simply_should_publish_pdt_func', 10, 2);
+function simply_should_publish_pdt_func($should_publish,$pdt_id){
+
+
+
+	$has_thumbnail = has_post_thumbnail($pdt_id);
+	return $has_thumbnail;
+}
+
 add_filter('simply_ItemsVariation', 'simply_ItemsVariation_func', 10, 2);
 function simply_ItemsVariation_func($childrens,$item)
 {
     //add collection
-    $childrens[$item['SPEC4']][$item['PARTNAME']]['product_collection'] = $item['SPEC7'];
+    $childrens[$item['SPEC4']][$item['PARTNAME']]['product_collection'] = $item['ROYY_SPEC2'];
 	
 	//collaboration
-    $childrens[$item['SPEC4']][$item['PARTNAME']]['product_collaboration'] = $item['SPEC16'];
+    $childrens[$item['SPEC4']][$item['PARTNAME']]['product_collaboration'] = $item['ROYY_SPEC3'];
 	
 	//add acf
 	$childrens[$item['SPEC4']][$item['PARTNAME']]['width'] = $item['SPEC3'];
@@ -77,6 +87,7 @@ add_filter('custom_product_data_before_create', function($data, $parent) {
 add_filter('custom_variation_data_before_create', function($data, $children) {
     // Add a custom field before product creation
     $data['color_code'] = $children['color_code'] ?? '';
+	$data['showinweb'] = $children['showinweb'] ?? '';
     return $data;
 }, 10, 3);
 
@@ -119,6 +130,10 @@ function simply_update_variation_data_func($variation_data){
     $color_code = $variation_data['color_code'];
     
     update_field('color_code', $color_code, $id);
+	
+	$showinweb = $variation_data['showinweb'];
+    
+    update_field('showinweb', $showinweb, $id);
 }
 
 add_filter('simply_ItemsPriceVariation', 'simply_ItemsPriceVariation_func',10,2);
@@ -128,13 +143,9 @@ function simply_ItemsPriceVariation_func($price,$item)
 
     return $price;
 }
-
-add_filter('simply_select_attr_for_variations', 'simply_select_attr_for_variations');
-function simply_select_attr_for_variations($key){
-    $variation_attributes = ['frame-color', 'lens-color'];
-    $is_variation = in_array($key, $variation_attributes) ? 1 : 0;
-    return $is_variation;
-}
+add_filter('simply_select_attr_for_variations', function($default_value, $key) {
+    return in_array($key, ['frame-color', 'lens-color']) ? 1 : 0;
+}, 10, 2);
 
 add_filter('simply_set_tags', 'simply_set_tags');
 function simply_set_tags($data){
@@ -154,6 +165,12 @@ function simply_set_tags($data){
     }
     return $data;
 }
+
+
+add_filter('simply_product_tags_append', function ($append) {
+    return false;
+});
+
 add_filter( 'woocommerce_variation_is_active', 'filter_out_of_stock_variations', 10, 2 );
 function filter_out_of_stock_variations( $active, $variation ) {
     if ( !$variation->get_price() ) {
@@ -222,7 +239,7 @@ function optimized_process_new_product_images() {
     $config         = json_decode( stripslashes( $raw_option ) );
 	$img_days_back            = ( ! empty( (int) $config->img_days_back ) ? $config->img_days_back : 1 );
     $yesterday = strtotime('-'.$img_days_back.' day');
-
+	custom_log_sync_image("sync attachment from date:".date('Y-m-d H:i:s', $yesterday));
     $attachments = get_posts([
         'post_type'      => 'attachment',
         'post_status'    => 'inherit',
@@ -363,7 +380,7 @@ add_filter('simply_syncInventoryPriority_data', 'simply_syncInventoryPriority_da
 function simply_syncInventoryPriority_data_func($data)
 
 {
-    $expand = '$expand=PARTBALANCE_SUBFORM($filter=ROYY_KROTZ eq \'Y\')';
+    $expand = '$expand=LOGCOUNTERS_SUBFORM($select=orders),PARTBALANCE_SUBFORM($filter=ROYY_KROTZ eq \'Y\';$select=WARHSNAME,TBALANCE)';
     $data['expand'] = $expand;
     $data['select'] = 'PARTNAME';
 
@@ -519,16 +536,16 @@ function simply_func_receipt($data){
     $order = new \WC_Order($order_id);
 	
 	$payment_method = $order->get_payment_method();
-	echo 'Payment method slug: ' . $payment_method . '<br>'; 
+	//echo 'Payment method slug: ' . $payment_method . '<br>'; 
 	//$billing_country = $order->get_billing_country();
 	$country_name = WC()->countries->countries[ $order->get_billing_country() ];
 	$data['EINVOICESCONT_SUBFORM'][0]['COUNTRYNAME'] = $country_name;
-	if ( in_array( $country, $eu_countries, true ) ) {
-		$data['EINVOICESCONT_SUBFORM'][0]['TAXCODE'] = "D01";
-	}
-	else{
-		$data['EINVOICESCONT_SUBFORM'][0]['TAXCODE'] = "D03";
-	}
+// 	if ( in_array( $country, $eu_countries, true ) ) {
+// 		$data['EINVOICESCONT_SUBFORM'][0]['TAXCODE'] = "D01";
+// 	}
+// 	else{
+// 		$data['EINVOICESCONT_SUBFORM'][0]['TAXCODE'] = "D03";
+// 	}
 	
 	if($payment_method == "stripe"){
 		$data['CASHNAME'] = '007';
@@ -538,6 +555,13 @@ function simply_func_receipt($data){
 		$data['CASHNAME'] = '005';
 		$data['EPAYMENT2_SUBFORM'][0]['PAYMENTCODE'] = "9";
 	}
+	
+	$billing_email = $order->get_billing_email();
+    $billing_phone = $order->get_billing_phone();
+	
+	$data['AGENTCODE'] = '013'; 
+	$data['ZYOU_PHONE'] = $billing_phone; 
+	$data['ZYOU_EMAIL'] = $billing_email; 
 	
 	//stripe = 007 paymentcode = 20
 	//paypal = 005 paymentcode = 9
@@ -598,9 +622,13 @@ function simply_func_receipt($data){
 	}
 	
 	if($payment_method == "stripe"){
-		
-		 $stripe_settings = get_option('woocommerce_stripe_settings');
-		$secret_key = $stripe_settings['test_secret_key'] ?? '';
+		echo 'enter stripe method';
+		$stripe_settings = get_option('woocommerce_stripe_settings');
+		//$secret_key = $stripe_settings['test_secret_key'] ?? '';
+		$testmode = isset($stripe_settings['testmode']) && $stripe_settings['testmode'] === 'yes';
+
+		// pick correct secret key
+		$secret_key = $testmode ? ($stripe_settings['test_secret_key'] ?? '') : ($stripe_settings['secret_key'] ?? '');
 		$stripe = new StripeClient($secret_key);
 		$pm_id = $order->get_meta('_stripe_source_id');
 
@@ -797,7 +825,6 @@ function simply_update_order_status_func( $data ) {
     $status = $data['status']; 
     if ( $order && $order->has_status( 'on-hold' ) ) {
         if ($status == "Final" ) {
-            $order->update_status( 'processing' );
 			send_order_to_ups_api( $order_id );
         }
     }
@@ -806,9 +833,12 @@ function simply_update_order_status_func( $data ) {
 
 function send_order_to_ups_api($order_id){
     $config = json_decode(stripslashes(WooAPI::instance()->option('setting-config')));
-    $access_token = $config->carmaapi;
-    $url = 'https://stage.esb.k8s.vce.de/oneflow/v1/ship';
+    //$access_token = $config->carmaapi;
+	$access_token = "a3JldXpiZXJna2luZGVyMjVfYXBpOjRUNm1uWU5kTTJ3S2tVbzUh";
+    //$url = 'https://stage.esb.k8s.vce.de/oneflow/v1/ship';
+	$url = "https://api.app.vce.de/oneflowship/v1/ship";
     $order = wc_get_order( $order_id );
+	$invoice_number = $order->get_meta( 'priority_invoice_number', true);
   
     if ( ! $order ) {
         wp_mail( get_option('admin_email'), 'Carma API Error', "Order #$order_id not found." );
@@ -821,6 +851,11 @@ function send_order_to_ups_api($order_id){
     $total_quantity   = $order->get_item_count();
 
     $streetnum = get_post_meta( $order->get_id(), '_shipping_street_number', true );
+
+	// If shipping street number is empty, use billing street number
+	if ( empty( $streetnum ) ) {
+		$streetnum = get_post_meta( $order->get_id(), '_billing_street_number', true );
+	}
 
     $package_details = [];
 
@@ -872,12 +907,12 @@ function send_order_to_ups_api($order_id){
         ],
         "receiver"     => $receiver,
         "tpls"         => ["UPS1"],
-        "services"     => [],
+        "services"     => ["STANDARD"],
         "incoterms"    => "DAP",
         "labelFormat"  => "PDFA6",
-        "reference"    => $order_id,
+        "reference"    => 20103983,
+		"reference2"   => $invoice_number,
         "orderNo"      => $order_id,
-        "shipmentId"   => $order_id,
         "skipPrinting" => true,
         "paperSize"    => "A6",
         "packages"     => [[
@@ -885,15 +920,18 @@ function send_order_to_ups_api($order_id){
             "width"         => $package_dimensions['width'],
             "height"        => $package_dimensions['height'],
             "weight"        => 2,
-            "content"       => "Eyewear",
+            "content"       => "Sunglasses, optical frames, cases",
             "type"          => "PARCEL",
             "thirdPartyOrderID" => $order_id,
-            "packageDetails"    => $package_details,
-            "reference"     => $order_id
+            "packageDetails"    => $package_details
         ]]
     ]];
 
     $json_body = wp_json_encode($body);
+	
+	echo "<pre>";
+	print_r($json_body);
+	echo "</pre>";
 
     $args = [
         'method'    => 'POST',
@@ -906,20 +944,35 @@ function send_order_to_ups_api($order_id){
     ];
 
     $response = wp_remote_request($url, $args);
+	
+		echo "<pre>";
+	print_r($response);
+	echo "</pre>";
+
 
     if (is_wp_error($response)) {
         $error_message = $response->get_error_message();
-        wp_mail(
-            get_option('admin_email'),
-            "Carma API Request Error - Order #$order_id",
-            "Error: $error_message\n\nRequest body:\n$json_body"
-        );
+        $subject = "Carma API Request Error - Order #$order_id";
+		$message  = "An error occurred during the API request.\n\n";
+		$message .= "Error message:\n$error_message\n\n";
+		$message .= "Request body (JSON):\n$json_body\n\n";
+		$message .= "Request URL:\n$url\n\n";
+
+		wp_mail(
+			get_option('admin_email'),
+			$subject,
+			$message
+		);
         return;
     }
 
     $status_code   = wp_remote_retrieve_response_code($response);
     $response_body = wp_remote_retrieve_body($response);
     $data          = json_decode($response_body, true);
+	
+	echo "<pre>";
+	print_r( $data );
+	echo "</pre>";
 
     // If invalid JSON or empty
     if (json_last_error() !== JSON_ERROR_NONE || empty($data)) {
@@ -950,13 +1003,15 @@ function send_order_to_ups_api($order_id){
         $order->update_meta_data('_tracking_number', $tracking_number);
 		$order->update_meta_data('_tracking_link', $tracking_link);
         $order->save();
+		$order->update_status( 'processing' );
+		
 
         // Optional: send success notification to admin
-//         wp_mail(
-//             get_option('admin_email'),
-//             "Carma API Success - Order #$order_id",
-//             "Tracking Number: $tracking_number"
-//         );
+        wp_mail(
+            get_option('admin_email'),
+            "Carma API Success - Order #$order_id",
+            "Tracking Number: $tracking_number"
+        );
 
         echo "Tracking Number saved: " . $tracking_number;
 
@@ -967,7 +1022,122 @@ function send_order_to_ups_api($order_id){
             "Response:\n$response_body"
         );
     }
+	
 
+}
+
+
+function my_custom_cron_schedules( $schedules ) {
+    $schedules['every_ten_minutes'] = array(
+        'interval' => 600, // 60 seconds * 10 minutes
+        'display'  => __( 'Every Ten Minutes' ),
+    );
+    return $schedules;
+}
+add_filter( 'cron_schedules', 'my_custom_cron_schedules' );
+
+
+function carma_webhook_log($message) {
+    $upload_dir = wp_upload_dir();
+    $log_file   = $upload_dir['basedir'] . '/tmp/carma_webhook.log';
+
+    // יצירת תיקייה במידה ולא קיימת
+    if (!file_exists(dirname($log_file))) {
+        wp_mkdir_p(dirname($log_file));
+    }
+
+    // איפוס תחילת חודש
+    if (date('j') == 1 && file_exists($log_file)) {
+        file_put_contents($log_file, ""); 
+    }
+
+    // כתיבה ללוג
+    $date = date("Y-m-d H:i:s");
+    error_log("[$date] $message\n", 3, $log_file);
+}
+
+
+add_action('rest_api_init', function () {
+    register_rest_route('carma/v1', '/webhook', [
+        'methods'  => 'POST',
+        'callback' => 'handle_carma_webhook',
+        'permission_callback' => '__return_true',
+    ]);
+});
+
+
+function handle_carma_webhook($request) {
+
+    carma_webhook_log("====== New Carma Webhook Received ======");
+
+    $data = $request->get_json_params();
+
+    if (!$data) {
+        carma_webhook_log("ERROR: No JSON received");
+        carma_webhook_send_error_email("No JSON received from Carma webhook.");
+
+        return new WP_REST_Response(['error' => 'No JSON received'], 400);
+    }
+
+    carma_webhook_log("RAW JSON: " . json_encode($data));
+
+    // ----- Extract tracking number + status -----
+    $tracking_number = $data['payload']['shipmentMasterTrackingNo'] ?? null;
+    $status          = strtoupper($data['payload']['status'] ?? '');
+
+    carma_webhook_log("Extracted tracking: {$tracking_number}, status: {$status}");
+
+    if (!$tracking_number || !$status) {
+        carma_webhook_log("ERROR: Missing tracking number or status");
+        carma_webhook_send_error_email("Missing tracking number or status in webhook payload.");
+
+        return new WP_REST_Response(['error' => 'Missing data'], 400);
+    }
+
+    // ----- Find order by tracking number -----
+    $orders = wc_get_orders([
+        'limit'      => 1,
+        'meta_key'   => '_tracking_number',
+        'meta_value' => $tracking_number,
+    ]);
+
+    if (empty($orders)) {
+        carma_webhook_log("ERROR: Order not found for tracking {$tracking_number}");
+        carma_webhook_send_error_email("No order found for tracking number: {$tracking_number}");
+
+        return new WP_REST_Response(['error' => 'Order not found'], 404);
+    }
+
+    $order = $orders[0];
+    carma_webhook_log("Order found: ID " . $order->get_id());
+
+    // ----- Update status -----
+    if ($status === 'DELIVERED') {
+        $order->update_status('completed', 'Delivered via Carma webhook');
+        carma_webhook_log("Order marked COMPLETED");
+
+    } elseif ($status === 'TRACKING_CREATED') {
+        $order->update_status('processing', 'Tracking created via Carma webhook');
+        carma_webhook_log("Order marked PROCESSING");
+
+    } else {
+        $order->add_order_note("Carma webhook received unknown status: {$status}");
+        carma_webhook_log("Unknown status received: {$status}");
+    }
+
+    return new WP_REST_Response(['success' => true], 200);
+}
+
+
+function carma_webhook_send_error_email($error_message) {
+    $admin_email = get_option('admin_email');
+
+    $subject = "⚠ Carma Webhook Error";
+    $body    = "An error occurred while processing the Carma webhook:\n\n";
+    $body   .= $error_message . "\n\n";
+    $body   .= "Please check the log file: wp-content/uploads/tmp/carma_webhook.log\n\n";
+
+    wp_mail($admin_email, $subject, $body);
 }
 
 
