@@ -435,7 +435,7 @@ function simply_after_receipt_func($array)
 
     $response = curl_exec($curl);
 	$response_data = json_decode($response, true);
-	//wp_mail('elisheva.g@simplyct.co.il','close receipt response data',  json_encode($response_data, JSON_PRETTY_PRINT));
+	wp_mail('elisheva.g@simplyct.co.il','close receipt response data',  json_encode($response_data, JSON_PRETTY_PRINT));
     $res = curl_getinfo($curl);
     if ($res['http_code'] <= 201) {
         if (isset($response_data['ivnum'])) {
